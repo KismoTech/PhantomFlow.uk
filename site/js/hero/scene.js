@@ -114,9 +114,12 @@ function initHero(hero) {
 
   // Particles follow the contours (perpendicular to the gradient) and drift downhill; the
   // pointer swirls them and the rider leaves a wake.
-  const drawFlow = () => {
+  // Time-based (not per frame), so the flow looks the same at 60, 144 or 240 Hz.
+  const drawFlow = (dt) => {
     const f = ctx.flow;
-    f.fillStyle = rgba(COLOR.forest, 0.08); f.fillRect(0, 0, w, h);
+    const k = Math.max(0.25, Math.min(3, dt * 60)); // elapsed time in 60 Hz frames
+    f.fillStyle = rgba(COLOR.forest, 1 - Math.pow(1 - 0.08, k)); // trails fade at a fixed rate per second
+    f.fillRect(0, 0, w, h);
     const U = trail.unit;
     f.lineWidth = 1.45 * U;
     for (const p of particles) {
@@ -133,9 +136,10 @@ function initHero(hero) {
         if (rd < 90 * U) { const k = (1 - rd / (90 * U)) * 2.2 * U; vx += rider.hx * k; vy += rider.hy * k; }
       }
       f.strokeStyle = p.oxide ? rgba(COLOR.oxide, 0.5) : rgba(COLOR.moss, 0.45);
+      vx *= k; vy *= k;
       f.beginPath(); f.moveTo(p.x, p.y); f.lineTo(p.x + vx, p.y + vy); f.stroke();
       p.x += vx; p.y += vy;
-      if (--p.life < 0 || p.x < -5 || p.x > w + 5 || p.y < -5 || p.y > h + 5) spawn(p);
+      if ((p.life -= k) < 0 || p.x < -5 || p.x > w + 5 || p.y < -5 || p.y > h + 5) spawn(p);
     }
   };
 
@@ -203,7 +207,7 @@ function initHero(hero) {
       startRun();
     }
     const fade = rider.done ? Math.max(0, Math.min(1, hold / 0.5)) : Math.min(1, rider.t / 0.4);
-    drawFlow();
+    drawFlow(dt);
     drawRun(fade);
     updateHud(now);
     if (!REDUCED_MOTION) raf = requestAnimationFrame(frame);
