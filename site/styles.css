@@ -309,3 +309,10 @@ input[type="range"]:focus-visible { outline: none; }
   .pulse { animation: none; }
   .bar i { transition: none; }
 }
+
+/* hero flow field: the terrain, stirred by the pointer */
+.hero .hero-flow { z-index: -3; opacity: 1; -webkit-mask: none; mask: none; }
+.access .contours path { stroke: rgba(169, 199, 156, 0.14); }
+.access .summit path { stroke: rgba(169, 199, 156, 0.13); stroke-linejoin: round; }
+.access .summit path:nth-child(-n+3) { stroke: rgba(169, 199, 156, 0.22); }
+.access .summit .summit-dot { fill: var(--oxide); opacity: 0; }

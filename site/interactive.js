@@ -1,6 +1,7 @@
 // PhantomFlow.uk: interactive "flow" effects.
 // 1. Find your flow: an illustrative suspension + speed sim, your setup vs the phantom setup.
-// 2. Flow field: particles streaming along a trail-like field, swirled by the pointer.
+// 2. Flow field: particles streaming along a trail-like field, swirled by the pointer
+//    (and, in the hero, by the rider's playhead).
 // No dependencies. Everything respects prefers-reduced-motion.
 
 const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -299,6 +300,7 @@ const fitCanvas = (canvas, ctx, width, height) => {
   const ctx = canvas.getContext("2d");
   const host = canvas.parentElement;
   const pointer = { x: -1e4, y: -1e4 };
+  const rider = host.classList.contains("hero");
   let w = 0, h = 0, parts = [], raf = 0, running = false;
 
   const spawn = (p = {}, edge = false) => Object.assign(p, {
@@ -326,6 +328,11 @@ const fitCanvas = (canvas, ctx, width, height) => {
       let vx = Math.cos(a) * 1.15 + 0.55, vy = Math.sin(a) * 0.9;
       const dx = p.x - pointer.x, dy = p.y - pointer.y, d = Math.hypot(dx, dy);
       if (d < 200) { const f = (1 - d / 200) * 2.4; vx += (-dy / (d + 1)) * f; vy += (dx / (d + 1)) * f; }
+      if (rider && window.PF_HEAD) {
+        // The rider's playhead leaves a wake: particles near it are swept along the run.
+        const hx = p.x - window.PF_HEAD.x, hy = p.y - window.PF_HEAD.y, hd = Math.hypot(hx, hy);
+        if (hd < 130) { const f = (1 - hd / 130) * 1.8; vx += f * 1.6; vy += (-hy / (hd + 1)) * f * 0.6; }
+      }
       ctx.strokeStyle = p.blue ? "rgba(169,199,156,0.4)" : "rgba(226,96,44,0.45)";
       ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + vx, p.y + vy); ctx.stroke();
       p.x += vx; p.y += vy;

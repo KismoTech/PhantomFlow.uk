@@ -144,6 +144,7 @@
     const tHead = t0 + (head / w) * WINDOW;
     const vHead = live(tHead);
     const yHead = yOf(vHead, top, band);
+    window.PF_HEAD = { x: head, y: yHead }; // lets the hero flow field react to the rider
     const lg = ctx.createLinearGradient(0, top - 40, 0, top + band + 40);
     lg.addColorStop(0, "rgba(255,255,255,0)"); lg.addColorStop(0.5, "rgba(255,255,255,0.22)"); lg.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = lg; ctx.fillRect(Math.round(head), top - 40, 1, band + 80);
