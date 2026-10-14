@@ -4,15 +4,22 @@ Public website for **PhantomFlow** by KismoTech. It's a static site with no buil
 GitHub Pages by the Actions workflow.
 
 ```text
-site/                    ← everything published (and nothing else)
-├── index.html           landing page
-├── flow.html            "Find your flow" interactive setup simulator
-├── styles.css           shared styles: Contour brand tokens, light sand + .dark forest themes
-├── main.js              hero terrain scene (contours, flow, riders), header, scroll reveals
-├── interactive.js       simulator, flow field
-├── favicon.svg          brand mark (source: design repo docs/brand/assets/mark.svg)
-├── fonts/               self-hosted Archivo + IBM Plex Mono (woff2, SIL OFL; licences included)
-└── 404.html             self-contained (works at any path depth)
+site/                         everything published (and nothing else)
+├── index.html                landing page
+├── flow.html                 "Find your flow" setup simulator
+├── 404.html                  self-contained (works at any path depth)
+├── styles.css                Contour brand tokens; light sand + .dark forest themes
+├── favicon.svg               brand mark (source: design repo docs/brand/assets/mark.svg)
+├── fonts/                    self-hosted Archivo + IBM Plex Mono (woff2, SIL OFL; licences included)
+└── js/                       native ES modules, no build step
+    ├── util.js               palette, PRNG, canvas sizing, formatting, visibility helper
+    ├── page.js               header state and scroll reveals (every page)
+    ├── simulator.js          flow.html simulator
+    └── hero/                 index.html hero: one terrain, seen from above
+        ├── trail.js          seeded meandering trail and queries along it
+        ├── terrain.js        height grid built around the trail; contours and map drawing
+        ├── race.js           rider physics, line choice, pointer steering, phantom replay
+        └── scene.js          layout, canvases, particle flow, render loop, HUD, input
 .github/workflows/pages.yml   deploys site/ on push to main
 ```
 
@@ -49,6 +56,8 @@ The simulator is a generic spring-damper model, so it reveals nothing about how 
 - Sections default to sand. Add `.dark` for forest; components re-theme via CSS variables.
 - No third-party scripts, fonts or trackers (fonts are self-hosted), so no cookie banner is needed.
 - All motion respects `prefers-reduced-motion`. Canvases pause when off-screen.
+- Hero URL options: `?seed=N` pins a trail; `?debug` exposes `window.__pf` (race, trail,
+  terrain, physics constants) for tuning.
 
 ## Go-live checklist
 

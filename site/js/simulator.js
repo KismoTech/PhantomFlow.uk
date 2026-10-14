@@ -1,23 +1,16 @@
-// PhantomFlow.uk: interactive "flow" effects.
-// 1. Find your flow: an illustrative suspension + speed sim, your setup vs the phantom setup.
-// 2. Flow field: particles streaming along a trail-like field, swirled by the pointer.
-// No dependencies. Everything respects prefers-reduced-motion.
+// "Find your flow": an illustrative suspension + speed simulation for flow.html.
+// A spring-damper fork rides a fixed section of track. Poor setup bleeds bike speed
+// (harshness, bottom-outs, packing down, kick-back), and lost speed becomes lost time
+// against the phantom setup. It's a generic model and says nothing about how
+// PhantomFlow measures.
+import { REDUCED_MOTION, COLOR, rgba, fitCanvas } from "./util.js";
 
-const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-const fitCanvas = (canvas, ctx, width, height) => {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = Math.round(width * dpr);
-  canvas.height = Math.round(height * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-};
-
-// ── 1. Find your flow ─────────────────────────────────────────────
 // A spring-damper fork rides a fixed section of track. Bad setup bleeds bike speed
 // (harshness, bottom-outs, packing down, kick-back), and lost speed becomes lost time.
-(() => {
-  const root = document.querySelector("[data-tuner]");
-  if (!root) return;
+const root = document.querySelector("[data-tuner]");
+if (root) initSimulator(root);
+
+function initSimulator(root) {
   const canvas = root.querySelector("[data-tuner-canvas]");
   const ctx = canvas.getContext("2d");
   const inputs = { comp: root.querySelector('[data-in="comp"]'), reb: root.querySelector('[data-in="reb"]') };
@@ -119,12 +112,12 @@ const fitCanvas = (canvas, ctx, width, height) => {
     arr.forEach((p, i) => (i ? ctx.lineTo(X(i, arr.length), Y(p)) : ctx.moveTo(X(i, arr.length), Y(p))));
   };
   const strokePhantom = () => {
-    ctx.save(); ctx.setLineDash([2, 6]); ctx.lineWidth = 2; ctx.strokeStyle = "rgba(233,226,210,0.75)";
+    ctx.save(); ctx.setLineDash([2, 6]); ctx.lineWidth = 2; ctx.strokeStyle = rgba(COLOR.sand, 0.75);
     ctx.stroke(); ctx.restore();
   };
   const strokeLive = () => {
-    ctx.save(); ctx.lineWidth = 2.4; ctx.lineJoin = "round"; ctx.strokeStyle = "#E2602C";
-    ctx.shadowColor = "rgba(226,96,44,0.45)"; ctx.shadowBlur = 8; ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.lineWidth = 2.4; ctx.lineJoin = "round"; ctx.strokeStyle = COLOR.oxide;
+    ctx.shadowColor = rgba(COLOR.oxide, 0.45); ctx.shadowBlur = 8; ctx.stroke(); ctx.restore();
   };
   const hline = (y, color) => {
     ctx.strokeStyle = color; ctx.beginPath(); ctx.moveTo(pad.l, Math.round(y) + 0.5); ctx.lineTo(w - pad.r, Math.round(y) + 0.5); ctx.stroke();
@@ -140,30 +133,30 @@ const fitCanvas = (canvas, ctx, width, height) => {
     // sector bands + labels
     let from = 0;
     SECTORS.forEach(({ name, end }, i) => {
-      ctx.fillStyle = i % 2 ? "rgba(255,255,255,0.018)" : "rgba(255,255,255,0.035)";
+      ctx.fillStyle = i % 2 ? rgba(COLOR.sand, 0.018) : rgba(COLOR.sand, 0.035);
       ctx.fillRect(Xt(from), g.travelTop, Xt(end) - Xt(from), g.speedTop + g.speedH - g.travelTop);
       const text = name.toUpperCase();
-      if (ctx.measureText(text).width + 10 <= Xt(end) - Xt(from)) tag(text, Xt(from) + 6, g.labelY, "rgba(255,255,255,0.38)");
+      if (ctx.measureText(text).width + 10 <= Xt(end) - Xt(from)) tag(text, Xt(from) + 6, g.labelY, rgba(COLOR.sand, 0.38));
       from = end;
     });
 
     // reference lines
     ctx.lineWidth = 1; ctx.setLineDash([3, 5]);
-    hline(Ytravel(g, 1), "rgba(255,122,112,0.4)");
-    hline(Ytravel(g, SAG), "rgba(255,255,255,0.12)");
-    hline(Yspeed(g, V0), "rgba(255,255,255,0.10)");
-    ctx.strokeStyle = "rgba(169,199,156,0.7)";
+    hline(Ytravel(g, 1), rgba(COLOR.loss, 0.4));
+    hline(Ytravel(g, SAG), rgba(COLOR.sand, 0.12));
+    hline(Yspeed(g, V0), rgba(COLOR.sand, 0.10));
+    ctx.strokeStyle = rgba(COLOR.moss, 0.7);
     const rootsSector = SECTORS.findIndex((s) => s.name === "Roots");
     const fx0 = Xt(SECTORS[rootsSector - 1].end), fx1 = Xt(SECTORS[rootsSector].end);
     const fy = Math.round(Yspeed(g, FLOAT_KMH / 3.6)) + 0.5;
     ctx.beginPath(); ctx.moveTo(fx0, fy); ctx.lineTo(fx1, fy); ctx.stroke();
     ctx.setLineDash([]);
-    tag(`FLOAT ${FLOAT_KMH} KM/H`, fx0 + 6, fy - 5, "rgba(169,199,156,0.95)");
-    tag("SUSPENSION TRAVEL", pad.l + 6, g.travelTop + 12, "rgba(255,255,255,0.5)");
-    tag("BOTTOM-OUT", w - pad.r - 74, Ytravel(g, 1) - 6, "rgba(255,122,112,0.75)");
-    tag("SAG", w - pad.r - 24, Ytravel(g, SAG) - 6, "rgba(255,255,255,0.32)");
-    tag("BIKE SPEED", pad.l + 6, g.speedTop - 8, "rgba(255,255,255,0.5)");
-    tag(`${Math.round(V0 * 3.6)} KM/H`, w - pad.r - 50, Yspeed(g, V0) - 5, "rgba(255,255,255,0.32)");
+    tag(`FLOAT ${FLOAT_KMH} KM/H`, fx0 + 6, fy - 5, rgba(COLOR.moss, 0.95));
+    tag("SUSPENSION TRAVEL", pad.l + 6, g.travelTop + 12, rgba(COLOR.sand, 0.5));
+    tag("BOTTOM-OUT", w - pad.r - 74, Ytravel(g, 1) - 6, rgba(COLOR.loss, 0.75));
+    tag("SAG", w - pad.r - 24, Ytravel(g, SAG) - 6, rgba(COLOR.sand, 0.32));
+    tag("BIKE SPEED", pad.l + 6, g.speedTop - 8, rgba(COLOR.sand, 0.5));
+    tag(`${Math.round(V0 * 3.6)} KM/H`, w - pad.r - 50, Yspeed(g, V0) - 5, rgba(COLOR.sand, 0.32));
 
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, pad.l + progress * (w - pad.l - pad.r), h); ctx.clip();
@@ -177,18 +170,18 @@ const fitCanvas = (canvas, ctx, width, height) => {
     ctx.beginPath();
     shown.vs.forEach((s, i) => (i ? ctx.lineTo(Xi(i, shown.vs.length), Yspeed(g, s)) : ctx.moveTo(Xi(i, shown.vs.length), Yspeed(g, s))));
     for (let i = phantom.vs.length - 1; i >= 0; i--) ctx.lineTo(Xi(i, phantom.vs.length), Yspeed(g, phantom.vs[i]));
-    ctx.closePath(); ctx.fillStyle = "rgba(255,122,112,0.12)"; ctx.fill();
+    ctx.closePath(); ctx.fillStyle = rgba(COLOR.loss, 0.12); ctx.fill();
 
     {
       const ok = target.rootsKmh >= FLOAT_KMH;
       const y = Yspeed(g, target.rootsKmh / 3.6), x = Xt(target.rootsAt);
-      ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fillStyle = ok ? "rgba(169,199,156,0.25)" : "rgba(255,122,112,0.22)"; ctx.fill();
-      ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fillStyle = ok ? "#A9C79C" : "#FF7A70"; ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fillStyle = ok ? rgba(COLOR.moss, 0.25) : rgba(COLOR.loss, 0.22); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fillStyle = ok ? COLOR.moss : COLOR.loss; ctx.fill();
     }
     for (const t of target.marks) {
       const y = Ytravel(g, 1);
-      ctx.beginPath(); ctx.arc(Xt(t), y, 9, 0, Math.PI * 2); ctx.fillStyle = "rgba(255,122,112,0.2)"; ctx.fill();
-      ctx.beginPath(); ctx.arc(Xt(t), y, 3.5, 0, Math.PI * 2); ctx.fillStyle = "#FF7A70"; ctx.fill();
+      ctx.beginPath(); ctx.arc(Xt(t), y, 9, 0, Math.PI * 2); ctx.fillStyle = rgba(COLOR.loss, 0.2); ctx.fill();
+      ctx.beginPath(); ctx.arc(Xt(t), y, 3.5, 0, Math.PI * 2); ctx.fillStyle = COLOR.loss; ctx.fill();
     }
     ctx.restore();
   };
@@ -247,7 +240,7 @@ const fitCanvas = (canvas, ctx, width, height) => {
     renderSplits(m);
 
     cancelAnimationFrame(anim);
-    if (!animate || REDUCED) { shown = { xs: m.xs, vs: m.vs }; draw(); return; }
+    if (!animate || REDUCED_MOTION) { shown = { xs: m.xs, vs: m.vs }; draw(); return; }
     const t0 = performance.now();
     const step = (now) => {
       const p = Math.min(1, (now - t0) / 380), e = 1 - Math.pow(1 - p, 3);
@@ -274,7 +267,7 @@ const fitCanvas = (canvas, ctx, width, height) => {
   resize();
 
   // Draw the traces on the first time the panel scrolls into view.
-  if ("IntersectionObserver" in window && !REDUCED) {
+  if ("IntersectionObserver" in window && !REDUCED_MOTION) {
     progress = 0; draw();
     const io = new IntersectionObserver(([e]) => {
       if (!e.isIntersecting) return;
@@ -290,59 +283,4 @@ const fitCanvas = (canvas, ctx, width, height) => {
     }, { threshold: 0.3 });
     io.observe(canvas);
   }
-})();
-
-// ── 2. Flow field ─────────────────────────────────────────────────
-(() => {
-  const canvas = document.querySelector("[data-flowfield]");
-  if (!canvas || REDUCED) return;
-  const ctx = canvas.getContext("2d");
-  const host = canvas.parentElement;
-  const pointer = { x: -1e4, y: -1e4 };
-  let w = 0, h = 0, parts = [], raf = 0, running = false;
-
-  const spawn = (p = {}, edge = false) => Object.assign(p, {
-    x: edge ? -2 : Math.random() * w,
-    y: Math.random() * h,
-    life: 80 + Math.random() * 220,
-    blue: Math.random() > 0.72,
-  });
-
-  const resize = () => {
-    w = host.clientWidth; h = host.clientHeight;
-    fitCanvas(canvas, ctx, w, h);
-    parts = Array.from({ length: Math.min(1400, Math.round((w * h) / 900)) }, () => spawn());
-  };
-
-  const field = (x, y, t) =>
-    Math.sin(x * 0.0032 + t * 0.00011) * 1.1 + Math.cos(y * 0.0045 - t * 0.00007) * 0.9 + Math.sin((x + y) * 0.0017) * 0.6;
-
-  const frame = (t) => {
-    ctx.fillStyle = "rgba(21,36,29,0.075)";
-    ctx.fillRect(0, 0, w, h);
-    ctx.lineWidth = 1.1;
-    for (const p of parts) {
-      const a = field(p.x, p.y, t);
-      let vx = Math.cos(a) * 1.15 + 0.55, vy = Math.sin(a) * 0.9;
-      const dx = p.x - pointer.x, dy = p.y - pointer.y, d = Math.hypot(dx, dy);
-      if (d < 200) { const f = (1 - d / 200) * 2.4; vx += (-dy / (d + 1)) * f; vy += (dx / (d + 1)) * f; }
-      ctx.strokeStyle = p.blue ? "rgba(169,199,156,0.4)" : "rgba(226,96,44,0.45)";
-      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + vx, p.y + vy); ctx.stroke();
-      p.x += vx; p.y += vy;
-      if (--p.life < 0 || p.x > w + 5 || p.x < -5 || p.y < -5 || p.y > h + 5) spawn(p, Math.random() < 0.6);
-    }
-    raf = requestAnimationFrame(frame);
-  };
-
-  host.addEventListener("pointermove", (e) => {
-    const r = canvas.getBoundingClientRect();
-    pointer.x = e.clientX - r.left; pointer.y = e.clientY - r.top;
-  });
-  host.addEventListener("pointerleave", () => { pointer.x = pointer.y = -1e4; });
-  window.addEventListener("resize", resize);
-  resize();
-  new IntersectionObserver(([e]) => {
-    if (e.isIntersecting && !running) { running = true; raf = requestAnimationFrame(frame); }
-    else if (!e.isIntersecting && running) { running = false; cancelAnimationFrame(raf); }
-  }).observe(canvas);
-})();
+}
