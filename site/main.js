@@ -118,57 +118,105 @@
     }
   };
 
-  // The run line: Catmull-Rom through waypoints, resampled by arc length.
-  let path = [], pathLen = 0;
-  const buildPath = () => {
-    const pts = narrow
-      ? [[1.06, 0.15], [0.82, 0.05], [0.62, 0.42], [0.40, 0.18], [0.22, 0.62], [0.05, 0.40], [-0.08, 0.85]]
-          .map(([u, t]) => [u * w, band.top + t * (band.bottom - band.top)])
-      : [[0.98, 0.10], [0.84, 0.30], [0.90, 0.48], [0.72, 0.56], [0.80, 0.74], [0.60, 0.80], [0.66, 0.98]]
-          .map(([u, v]) => [u * w, v * h]);
-    const P = [pts[0], ...pts, pts[pts.length - 1]];
-    const raw = [];
-    for (let i = 1; i < P.length - 2; i++) {
-      const [p0, p1, p2, p3] = [P[i - 1], P[i], P[i + 1], P[i + 2]];
-      for (let t = 0; t < 1; t += 0.02) {
-        const t2 = t * t, t3 = t2 * t;
-        raw.push([0, 1].map((k) => 0.5 * ((2 * p1[k]) + (-p0[k] + p2[k]) * t + (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t2 + (-p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]) * t3)));
-      }
+  // ── The race ──
+  // The rider steers live: downhill along the fall line, carried by the terrain flow, with a
+  // little personality noise, and pulled toward the pointer when it is near. Every run is a new
+  // line. The fastest run so far is the phantom the next run races.
+  const course = { sx: 0, sy: 0, ax: 0, ay: 1, len: 1, lo: 0, hi: 0 };
+  const setCourse = () => {
+    if (narrow) {
+      const mid = (band.top + band.bottom) / 2;
+      Object.assign(course, { sx: w * 0.95, sy: mid, ax: -1, ay: 0, len: w * 0.9, lo: band.top + 8, hi: band.bottom - 8 });
+    } else {
+      Object.assign(course, { sx: w * 0.82, sy: h * 0.09, ax: 0, ay: 1, len: h * 0.78, lo: w * 0.56, hi: w * 0.97 });
     }
-    raw.push(pts[pts.length - 1]);
-    path = [{ x: raw[0][0], y: raw[0][1], d: 0 }];
-    for (let i = 1; i < raw.length; i++) {
-      const p = path[path.length - 1], d = Math.hypot(raw[i][0] - p.x, raw[i][1] - p.y);
-      path.push({ x: raw[i][0], y: raw[i][1], d: p.d + d });
-    }
-    pathLen = path[path.length - 1].d;
   };
-  const at = (s) => {
-    const target = Math.max(0, Math.min(1, s)) * pathLen;
-    let lo = 0, hi = path.length - 1;
-    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (path[m].d < target) lo = m; else hi = m; }
-    const a = path[lo], b = path[hi], k = (target - a.d) / (b.d - a.d || 1);
+  const progressOf = (x, y) => ((x - course.sx) * course.ax + (y - course.sy) * course.ay) / course.len;
+  const lateral = (x, y) => (course.ay ? x : y); // the free axis, bounded by lo / hi
+
+  let rider = null, phantom = null, best = null, flash = 0, flashAt = null, runNo = 0;
+  const newRider = (seed) => ({
+    x: course.sx, y: course.sy, hx: course.ax, hy: course.ay, v: 0, t: 0, done: false,
+    pts: [{ x: course.sx, y: course.sy, t: 0, p: 0 }],
+    ph: [seed * 1.7, seed * 2.9 + 1, seed * 0.6 + 2],
+  });
+
+  const BASE = () => course.len / 10.5; // px/s, so a run takes ~10-13 s
+  const stepRider = (r, dt, steer) => {
+    const [gx, gy] = grad(r.x, r.y);
+    const gl = Math.hypot(gx, gy) || 1;
+    const n = Math.sin(r.t * 0.9 + r.ph[0]) + 0.6 * Math.sin(r.t * 2.3 + r.ph[1]) + 0.3 * Math.sin(r.t * 4.1 + r.ph[2]);
+    // desired heading: course axis + downhill + along-contour flow + noise
+    let tx = course.ax - (gx / gl) * 0.55 + (gy / gl) * 0.35 * n;
+    let ty = course.ay - (gy / gl) * 0.55 - (gx / gl) * 0.35 * n;
+    tx += -course.ay * 0.55 * n; ty += course.ax * 0.55 * n; // lateral wander
+    if (steer) {
+      const dx = pointer.x - r.x, dy = pointer.y - r.y, d = Math.hypot(dx, dy);
+      if (d < 260 && d > 4) { const k = (1 - d / 260) * 2.4; tx += (dx / d) * k; ty += (dy / d) * k; }
+    }
+    // soft walls on the free axis
+    const lat = lateral(r.x, r.y), m = 40;
+    if (lat < course.lo + m) { const k = ((course.lo + m - lat) / m) * 2; if (course.ay) tx += k; else ty += k; }
+    if (lat > course.hi - m) { const k = ((lat - course.hi + m) / m) * 2; if (course.ay) tx -= k; else ty -= k; }
+    // never ride back up the course
+    const along = tx * course.ax + ty * course.ay;
+    if (along < 0.25) { tx += course.ax * (0.25 - along); ty += course.ay * (0.25 - along); }
+    const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+    // turn toward it; sharp turns cost speed
+    const turn = 1 - (r.hx * tx + r.hy * ty);
+    const rate = Math.min(1, dt * 3.2);
+    r.hx += (tx - r.hx) * rate; r.hy += (ty - r.hy) * rate;
+    const hl = Math.hypot(r.hx, r.hy) || 1; r.hx /= hl; r.hy /= hl;
+    // speed: steeper ground is faster, turning bleeds speed
+    const drop = -(gx * r.hx + gy * r.hy) / Math.max(gl, 0.5);
+    const target = BASE() * (0.85 + 0.45 * Math.max(-0.4, Math.min(1, drop)) - 1.4 * turn);
+    r.v += (Math.max(BASE() * 0.45, target) - r.v) * Math.min(1, dt * 1.6);
+    r.x += r.hx * r.v * dt; r.y += r.hy * r.v * dt; r.t += dt;
+    const p = progressOf(r.x, r.y);
+    const lastPt = r.pts[r.pts.length - 1];
+    if (Math.hypot(r.x - lastPt.x, r.y - lastPt.y) > 3) r.pts.push({ x: r.x, y: r.y, t: r.t, p });
+    if (p >= 1) r.done = true;
+  };
+
+  // Phantom replay, and comparison at the same point down the hill.
+  const replayAt = (run, t) => {
+    const P = run.pts;
+    if (t >= P[P.length - 1].t) return { x: P[P.length - 1].x, y: P[P.length - 1].y, i: P.length - 1 };
+    let lo = 0, hi = P.length - 1;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (P[m].t < t) lo = m; else hi = m; }
+    const a = P[lo], b = P[hi], k = (t - a.t) / (b.t - a.t || 1);
     return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, i: lo };
   };
-  // The phantom takes a slightly different line: offset along the path normal.
-  const LINE_OFFSET = (u) => 16 * Math.sin(Math.PI * u * 3) * Math.sin(Math.PI * u);
-  const shifted = (i, off) => {
-    const a = path[Math.max(0, i - 1)], b = path[Math.min(path.length - 1, i + 1)];
-    const tx = b.x - a.x, ty = b.y - a.y, tl = Math.hypot(tx, ty) || 1;
-    const k = off ? off(path[i].d / pathLen) : 0;
-    return { x: path[i].x - (ty / tl) * k, y: path[i].y + (tx / tl) * k };
+  const timeAtProgress = (run, p) => {
+    const P = run.pts;
+    for (let i = 1; i < P.length; i++) if (P[i].p >= p) {
+      const a = P[i - 1], b = P[i], k = (p - a.p) / (b.p - a.p || 1);
+      return a.t + (b.t - a.t) * k;
+    }
+    return P[P.length - 1].t;
   };
-  const atLine = (s, off) => {
-    const p = at(s);
-    if (!off) return p;
-    const q = shifted(p.i, off);
-    return { x: q.x + (p.x - path[p.i].x), y: q.y + (p.y - path[p.i].y), i: p.i };
+  const strokeRun = (c, P, endIdx, end) => {
+    c.beginPath(); c.moveTo(P[0].x, P[0].y);
+    for (let i = 1; i <= endIdx; i++) c.lineTo(P[i].x, P[i].y);
+    if (end) c.lineTo(end.x, end.y);
   };
-  const strokeTo = (c, s, off) => {
-    const end = atLine(s, off);
-    c.beginPath(); c.moveTo(path[0].x, path[0].y);
-    for (let i = 1; i <= end.i; i++) { const q = shifted(i, off); c.lineTo(q.x, q.y); }
-    c.lineTo(end.x, end.y);
+
+  const simulateRun = (seed) => {
+    const r = newRider(seed);
+    for (let i = 0; i < 6000 && !r.done; i++) stepRider(r, 1 / 60, false);
+    return r;
+  };
+  const startRace = () => {
+    runNo++;
+    rider = newRider(runNo + Math.random() * 10);
+    phantom = best;
+    flashAt = null;
+  };
+  const resetRace = () => {
+    setCourse();
+    best = simulateRun(0.5);
+    runNo = 0;
+    startRace();
   };
 
   // Flow particles.
@@ -190,35 +238,34 @@
     for (const k in layers) fit(layers[k], k);
     measure();
     drawTerrain();
-    buildPath();
     parts = Array.from({ length: Math.min(1300, Math.round((w * h) / 1000)) }, () => spawn());
     ctx.flow.fillStyle = "#15241D"; ctx.flow.fillRect(0, 0, w, h);
+    resetRace();
   };
-
-  // Run timing: one descent every RUN seconds; phantom gap breathes so the lead changes.
-  const RUN = 13;
-  let start = performance.now(), lastHud = 0;
-  const riderS = (t) => { const p = (t % RUN) / RUN; return p + 0.035 * Math.sin(p * Math.PI * 4) * p * (1 - p) * 4; };
-  const phantomS = (t) => { const p = (t % RUN) / RUN; return p + (0.022 * Math.sin(t * 0.45 + 1) + 0.006) * Math.sin(Math.PI * p); };
 
   const drawRider = (c, p, fill, ring) => {
     c.beginPath(); c.arc(p.x, p.y, 11, 0, Math.PI * 2); c.fillStyle = ring; c.fill();
     c.beginPath(); c.arc(p.x, p.y, 4, 0, Math.PI * 2); c.fillStyle = fill; c.fill();
   };
 
+  let last = performance.now(), lastHud = 0, hold = 0, raf = 0;
   const frame = (now) => {
-    const t = (now - start) / 1000;
-    const s = riderS(t), sp = phantomS(t);
-    const me = at(s), ph = atLine(sp, LINE_OFFSET);
-    const cycle = (t % RUN) / RUN;
-    const fade = cycle > 0.94 ? 1 - (cycle - 0.94) / 0.06 : cycle < 0.04 ? cycle / 0.04 : 1;
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+
+    // advance the race
+    if (!rider.done) stepRider(rider, dt, pointer.x > -1e3);
+    else if (!flashAt) {
+      flash = !best || rider.t < best.t ? 1 : -1;
+      flashAt = { x: rider.x, y: rider.y, delta: phantom ? rider.t - phantom.t : 0 };
+      if (flash > 0) best = rider;
+      hold = 1.8;
+    } else if ((hold -= dt) <= 0) startRace();
+    const fade = rider.done ? Math.max(0, Math.min(1, hold / 0.5)) : Math.min(1, rider.t / 0.4);
 
     // flow: particles follow the contours (perpendicular to the gradient), drift downhill
     const f = ctx.flow;
     f.fillStyle = "rgba(21,36,29,0.08)"; f.fillRect(0, 0, w, h);
     f.lineWidth = 1.1;
-    const ahead = at(Math.min(1, s + 0.01));
-    const hx0 = ahead.x - me.x, hy0 = ahead.y - me.y, hl = Math.hypot(hx0, hy0) || 1;
     for (const p of parts) {
       const [gx, gy] = grad(p.x, p.y);
       const gl = Math.hypot(gx, gy) || 1;
@@ -226,68 +273,81 @@
       let vy = (-gx / gl) * 1.25 - (gy / gl) * 0.25;
       const dx = p.x - pointer.x, dy = p.y - pointer.y, d = Math.hypot(dx, dy);
       if (d < 190) { const k = (1 - d / 190) * 2.6; vx += (-dy / (d + 1)) * k; vy += (dx / (d + 1)) * k; }
-      const rx = p.x - me.x, ry = p.y - me.y, rd = Math.hypot(rx, ry);
-      if (rd < 90) { const k = (1 - rd / 90) * 2.2 * fade; vx += (hx0 / hl) * k; vy += (hy0 / hl) * k; }
+      const rx = p.x - rider.x, ry = p.y - rider.y, rd = Math.hypot(rx, ry);
+      if (rd < 90 && !rider.done) { const k = (1 - rd / 90) * 2.2; vx += rider.hx * k; vy += rider.hy * k; }
       f.strokeStyle = p.oxide ? "rgba(226,96,44,0.42)" : "rgba(169,199,156,0.38)";
       f.beginPath(); f.moveTo(p.x, p.y); f.lineTo(p.x + vx, p.y + vy); f.stroke();
       p.x += vx; p.y += vy;
       if (--p.life < 0 || p.x < -5 || p.x > w + 5 || p.y < -5 || p.y > h + 5) spawn(p);
     }
 
-    // run layer: course ahead (faint), phantom line (dashed), your line (oxide), riders
+    // run layer: phantom (dashed replay of your best run), your line, riders
     const c = ctx.run;
     c.clearRect(0, 0, w, h);
     c.save();
     c.globalAlpha = fade;
     c.lineCap = "round"; c.lineJoin = "round";
-    c.setLineDash([1, 9]); c.lineWidth = 1.5; c.strokeStyle = "rgba(233,226,210,0.22)";
-    strokeTo(c, 1); c.stroke();
-    c.setLineDash([2, 7]); c.lineWidth = 2; c.strokeStyle = "rgba(233,226,210,0.75)";
-    strokeTo(c, sp, LINE_OFFSET); c.stroke();
-    c.setLineDash([]); c.lineWidth = 3; c.strokeStyle = "#E2602C";
+    let ph = null;
+    if (phantom) {
+      ph = replayAt(phantom, rider.t);
+      c.setLineDash([2, 7]); c.lineWidth = 2; c.strokeStyle = "rgba(233,226,210,0.75)";
+      strokeRun(c, phantom.pts, ph.i, ph); c.stroke();
+      c.setLineDash([]);
+    }
+    c.lineWidth = 3; c.strokeStyle = "#E2602C";
     c.shadowColor = "rgba(226,96,44,0.5)"; c.shadowBlur = 10;
-    strokeTo(c, s); c.stroke();
+    strokeRun(c, rider.pts, rider.pts.length - 1, rider); c.stroke();
     c.shadowBlur = 0;
-    drawRider(c, ph, "#E9E2D2", "rgba(233,226,210,0.14)");
-    drawRider(c, me, "#F3EEE3", "rgba(226,96,44,0.35)");
-    c.beginPath(); c.arc(path[0].x, path[0].y, 3, 0, Math.PI * 2); c.fillStyle = "#E2602C"; c.fill(); // summit / start
+    if (ph) drawRider(c, ph, "#E9E2D2", "rgba(233,226,210,0.14)");
+    drawRider(c, rider, "#F3EEE3", "rgba(226,96,44,0.35)");
+    c.beginPath(); c.arc(course.sx, course.sy, 3, 0, Math.PI * 2); c.fillStyle = "#E2602C"; c.fill(); // start gate
+    if (flashAt) {
+      c.font = "600 11px 'IBM Plex Mono', ui-monospace, monospace";
+      c.textAlign = narrow ? "left" : "right";
+      const ox = narrow ? 14 : -16;
+      c.fillStyle = flash > 0 ? "#A9C79C" : "#E9E2D2";
+      c.fillText(flash > 0 ? "NEW PHANTOM" : "PHANTOM HOLDS", flashAt.x + ox, flashAt.y - 4);
+      const d = flashAt.delta;
+      c.fillStyle = d <= 0 ? "#A9C79C" : "#FF7A70";
+      c.fillText(`${d <= 0 ? "−" : "+"}${Math.abs(d).toFixed(2)} s`, flashAt.x + ox, flashAt.y + 12);
+    }
     c.restore();
 
     if (now - lastHud > 120) {
       lastHud = now;
-      const delta = (s - sp) * RUN * 1.6;               // + means the phantom is ahead
-      const slope = Math.hypot(...grad(me.x, me.y));
-      if (hud.sector) hud.sector.textContent = `S${Math.min(4, 1 + Math.floor(Math.min(0.999, s) * 4))}`;
-      if (hud.speed) hud.speed.textContent = `${(27 + Math.min(12, slope * 9) + 2 * Math.sin(t * 1.3)).toFixed(1)} km/h`;
+      const p = Math.max(0, Math.min(0.999, progressOf(rider.x, rider.y)));
+      const delta = phantom ? rider.t - timeAtProgress(phantom, p) : 0; // + means behind the phantom
+      if (hud.sector) hud.sector.textContent = `S${1 + Math.floor(p * 4)}`;
+      if (hud.speed) hud.speed.textContent = `${(16 + (rider.v / BASE()) * 18).toFixed(1)} km/h`;
       if (hud.delta) {
-        const lead = -delta;
-        hud.delta.textContent = `${lead < 0 ? "−" : "+"}${Math.abs(lead).toFixed(2)} s`;
-        hud.delta.classList.toggle("ahead", lead < 0);
-        hud.delta.classList.toggle("behind", lead >= 0);
+        hud.delta.textContent = `${delta < 0 ? "−" : "+"}${Math.abs(delta).toFixed(2)} s`;
+        hud.delta.classList.toggle("ahead", delta < 0);
+        hud.delta.classList.toggle("behind", delta >= 0);
       }
     }
     if (!reduced) raf = requestAnimationFrame(frame);
   };
 
   hero.addEventListener("pointermove", (e) => {
+    if (e.pointerType !== "mouse" && e.pointerType !== "pen") return;
     const r = hero.getBoundingClientRect();
     pointer.x = e.clientX - r.left; pointer.y = e.clientY - r.top;
   });
   hero.addEventListener("pointerleave", () => { pointer.x = pointer.y = -1e4; });
 
   resize();
-  setTimeout(() => { measure(); if (narrow) buildPath(); }, 1300); // after reveal transitions settle
+  setTimeout(() => { measure(); if (narrow) resetRace(); }, 1300); // after reveal transitions settle
   let rt = 0;
   window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(resize, 120); });
 
   if (reduced) {
-    start = performance.now() - RUN * 0.55 * 1000; // a still frame mid-run
+    for (let i = 0; i < 400 && !rider.done; i++) stepRider(rider, 1 / 60, false); // a still frame mid-run
     frame(performance.now());
     return;
   }
-  let raf = requestAnimationFrame(frame);
+  raf = requestAnimationFrame(frame);
   new IntersectionObserver(([e]) => {
     cancelAnimationFrame(raf);
-    if (e.isIntersecting) raf = requestAnimationFrame(frame);
+    if (e.isIntersecting) { last = performance.now(); raf = requestAnimationFrame(frame); }
   }).observe(hero);
 })();

@@ -316,3 +316,7 @@ input[type="range"]:focus-visible { outline: none; }
 .access .summit path { stroke: rgba(169, 199, 156, 0.13); stroke-linejoin: round; }
 .access .summit path:nth-child(-n+3) { stroke: rgba(169, 199, 156, 0.22); }
 .access .summit .summit-dot { fill: var(--oxide); opacity: 0; }
+
+.hud-hint { display: none !important; font: 500 .68rem/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--oxide); }
+@media (hover: hover) and (pointer: fine) and (min-width: 1000px) { .hud-hint { display: inline-flex !important; } }
+.hud-legend span { white-space: nowrap; }
