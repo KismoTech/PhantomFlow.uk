@@ -8,7 +8,7 @@ site/                    ← everything published (and nothing else)
 ├── index.html           landing page
 ├── flow.html            "Find your flow" interactive setup simulator
 ├── styles.css           shared styles: Contour brand tokens, light sand + .dark forest themes
-├── main.js              hero telemetry animation, header, scroll reveals
+├── main.js              hero terrain scene (contours, flow, riders), header, scroll reveals
 ├── interactive.js       simulator, flow field
 ├── favicon.svg          brand mark (source: design repo docs/brand/assets/mark.svg)
 ├── fonts/               self-hosted Archivo + IBM Plex Mono (woff2, SIL OFL; licences included)

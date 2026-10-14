@@ -37,9 +37,10 @@
 
   <main id="main">
     <!-- HERO -->
-    <section class="hero dark" aria-labelledby="hero-title">
-      <canvas class="flow-field hero-flow" data-flowfield aria-hidden="true"></canvas>
-      <canvas class="hero-canvas" data-trace aria-hidden="true"></canvas>
+    <section class="hero dark" data-hero aria-labelledby="hero-title">
+      <canvas class="hero-layer" data-flow aria-hidden="true"></canvas>
+      <canvas class="hero-layer" data-terrain aria-hidden="true"></canvas>
+      <canvas class="hero-layer" data-run aria-hidden="true"></canvas>
       <div class="hero-vignette" aria-hidden="true"></div>
 
       <div class="wrap hero-inner">
@@ -55,7 +56,7 @@
       </div>
 
       <div class="hud" aria-hidden="true">
-        <div class="hud-cell"><span class="hud-label">Travel</span><span class="hud-val" data-hud="travel">—</span></div>
+        <div class="hud-cell"><span class="hud-label">Sector</span><span class="hud-val" data-hud="sector">—</span></div>
         <div class="hud-cell"><span class="hud-label">Bike speed</span><span class="hud-val" data-hud="speed">—</span></div>
         <div class="hud-cell"><span class="hud-label">Δ Phantom</span><span class="hud-val delta" data-hud="delta">—</span></div>
         <div class="hud-cell hud-legend">
