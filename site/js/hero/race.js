@@ -1,7 +1,7 @@
 // The race: rider physics and line choice on the terrain, plus phantom replay helpers.
 //
-// Units are course-relative so behaviour is the same at any screen size: speeds scale with
-// BASE (trail length / 9.6 per second), slopes with the trail length.
+// Units are relative so behaviour is the same at any screen size: distances and speeds scale
+// with the trail's unit (BASE = 170 unit-px/s), slopes with the trail length.
 //   - Gravity comes from the real ground slope in the direction ridden (the trail has no
 //     special status; it's simply where the ground is kindest). Descents steeper than the
 //     course fall only partly pay back (braking, scrub). Drag caps speed; rough ground off
@@ -30,14 +30,13 @@ export const PHYS = {
   wander: 0.4,     // personality line swing
 };
 
-const POINTER_RADIUS = 280;     // px within which the pointer influences the line
+const POINTER_RADIUS = 280;     // × unit px within which the pointer influences the line
 const CUT_REACH = 1.4;          // how far past the trail edge the pointer may pull (× half-width)
 const MIN_SPEED = 0.35;         // × BASE: riders never quite stop
-const FINISH = 0.985;           // progress that counts as the finish
 
 export function createRace({ trail, terrain, box }) {
-  const BASE = trail.length / 9.6;
-  const W = trail.width;
+  const BASE = 170 * trail.unit; // reference speed (px/s): the same relative pace at any size
+  const W = trail.width, U = trail.unit;
 
   const newRider = (seed) => {
     const personality = mulberry32(Math.floor(seed * 1e4) + 7);
@@ -61,8 +60,8 @@ export function createRace({ trail, terrain, box }) {
     // ── Where to aim ──
     // The furthest trail point within reach of where the rider actually is (so during and
     // after a shortcut it's the later section), never moving back up the trail.
-    const reach = Math.max(22, Math.min(trail.span * 0.09, r.v * 0.3));
-    const lookAhead = reach * 1.6 + 70 * (r.pull || 0); // riders follow the loops; the pointer can cut more
+    const reach = Math.max(22 * U, Math.min(trail.span * 0.09, r.v * 0.3));
+    const lookAhead = reach * 1.6 + 70 * U * (r.pull || 0); // riders follow the loops; the pointer can cut more
     let aimD = here0.d + reach;
     for (let i = r.ri; i < pts.length && pts[i].d < here0.d + lookAhead; i++) {
       if ((pts[i].x - r.x) ** 2 + (pts[i].y - r.y) ** 2 <= reach * reach) aimD = Math.max(aimD, pts[i].d);
@@ -77,9 +76,9 @@ export function createRace({ trail, terrain, box }) {
     let pull = 0;
     if (pointer) {
       const d = Math.hypot(pointer.x - r.x, pointer.y - r.y);
-      if (d < POINTER_RADIUS) {
+      if (d < POINTER_RADIUS * U) {
         const side = (pointer.x - goal.x) * -goal.ty + (pointer.y - goal.y) * goal.tx;
-        pull = Math.min(1, (1 - d / POINTER_RADIUS) * 2);
+        pull = Math.min(1, (1 - d / (POINTER_RADIUS * U)) * 2);
         off = off * (1 - pull) + clamp(side, -CUT_REACH * W, CUT_REACH * W) * pull;
       }
     }
@@ -106,18 +105,18 @@ export function createRace({ trail, terrain, box }) {
     // trail magnet: past the edge (plus any cut allowance), steer back on, rejoining ahead
     const dTrail = Math.hypot(here0.x - r.x, here0.y - r.y);
     if (dTrail > W * 0.7 + reachOut) {
-      const back = trail.at(Math.max(here0.d + Math.max(10, r.v * 0.12), r.aimD - 20));
+      const back = trail.at(Math.max(here0.d + Math.max(10 * U, r.v * 0.12), r.aimD - 20 * U));
       const bx = back.x - r.x, by = back.y - r.y, bl = Math.hypot(bx, by) || 1;
       const k = Math.min(4, ((dTrail - W * 0.7 - reachOut) / W) * 3);
       tx += (bx / bl) * k; ty += (by / bl) * k;
     }
     let tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
-    // soft walls keep the rider inside the course box
-    const m = 24;
-    if (r.x < box.x0 + m) tx += ((box.x0 + m - r.x) / m) * 2;
-    if (r.x > box.x1 - m) tx -= ((r.x - box.x1 + m) / m) * 2;
-    if (r.y < box.y0 + m) ty += ((box.y0 + m - r.y) / m) * 2;
-    if (r.y > box.y1 - m) ty -= ((r.y - box.y1 + m) / m) * 2;
+    // soft walls keep the rider near the course box (a trail-width of slack around it)
+    const m = 24 * U, x0 = box.x0 - W, x1 = box.x1 + W, y0 = box.y0 - W, y1 = box.y1 + W;
+    if (r.x < x0 + m) tx += ((x0 + m - r.x) / m) * 2;
+    if (r.x > x1 - m) tx -= ((r.x - x1 + m) / m) * 2;
+    if (r.y < y0 + m) ty += ((y0 + m - r.y) / m) * 2;
+    if (r.y > y1 - m) ty -= ((r.y - y1 + m) / m) * 2;
     // never ride against the trail direction
     const tan = trail.at(r.aimD), along = tx * tan.tx + ty * tan.ty;
     if (along < 0.15) { tx += tan.tx * (0.15 - along); ty += tan.ty * (0.15 - along); }
@@ -147,7 +146,7 @@ export function createRace({ trail, terrain, box }) {
     // brake ahead of the corner coming up (v² ≤ grip · radius, with a personal margin)
     const margin = 0.62 + 0.28 * (r.push - 0.86) / 0.26;
     for (const k of [0.35, 0.7, 1]) {
-      const L = Math.max(20, r.v * PHYS.anticipate * k);
+      const L = Math.max(20 * U, r.v * PHYS.anticipate * k);
       const t1 = trail.at(here0.d + 2), t2 = trail.at(here0.d + L);
       const turn = Math.acos(clamp(t1.tx * t2.tx + t1.ty * t2.ty, -1, 1));
       if (turn > 0.05) {
@@ -161,8 +160,8 @@ export function createRace({ trail, terrain, box }) {
 
     const p = trail.progressAt(r.ri);
     const lastPt = r.pts[r.pts.length - 1];
-    if (Math.hypot(r.x - lastPt.x, r.y - lastPt.y) > 3) r.pts.push({ x: r.x, y: r.y, t: r.t, p });
-    if (p > FINISH) r.done = true; // only by reaching the end of the trail
+    if (Math.hypot(r.x - lastPt.x, r.y - lastPt.y) > 3 * U) r.pts.push({ x: r.x, y: r.y, t: r.t, p });
+    if (trail.crossedFinish(r.x, r.y, r.ri)) r.done = true; // past the line, having ridden the trail
   };
 
   /** Run a whole race without a pointer (used for the first phantom and for tuning). */

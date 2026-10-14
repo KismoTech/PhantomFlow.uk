@@ -5,7 +5,8 @@ import { clamp } from "../util.js";
 
 const STEP = 0.025;          // Catmull-Rom sample step per segment
 const MIN_GAP = 0.17;        // control points this far apart (box units) so loops never touch
-const JUMP_AHEAD_PX = 200;   // how far a shortcut may move progress forward
+const JUMP_AHEAD = 200;      // how far a shortcut may move progress forward (× unit px)
+const REF_SPAN = 785;        // course span (px) the hero was tuned at: unit = 1
 
 /**
  * @param {{x0:number,x1:number,y0:number,y1:number}} box  area the trail may use (px)
@@ -55,7 +56,12 @@ export function createTrail(box, narrow, rand) {
     if (dd > 0.5) points.push({ x, y, d: q.d + dd });
   }
   const length = points[points.length - 1].d;
-  const width = Math.max(18, narrow ? bh * 0.16 : bw * 0.095); // half-width of the trail valley (px)
+  // One scale unit for every distance in the hero (pointer reach, look-ahead, particle speed,
+  // stroke widths…): the same scene, just bigger on bigger screens. Floored so small screens
+  // keep the tuned values.
+  const span = narrow ? bw : bh;
+  const unit = Math.max(0.85, span / REF_SPAN);
+  const width = narrow ? Math.max(18, bh * 0.16) : 30 * unit; // half-width of the trail valley (px)
 
   /** Point and unit tangent at arc length `d`. */
   const at = (d) => {
@@ -79,19 +85,35 @@ export function createTrail(box, narrow, rand) {
       const d = (points[i].x - x) ** 2 + (points[i].y - y) ** 2;
       if (d < bd) { bd = d; best = i; }
     }
-    const limit = points[from].d + JUMP_AHEAD_PX, reach2 = (width * 1.1) ** 2;
+    const limit = points[from].d + JUMP_AHEAD * unit, reach2 = (width * 1.1) ** 2;
     for (let i = from + 14; i < points.length && points[i].d < limit; i++) {
       const d = (points[i].x - x) ** 2 + (points[i].y - y) ** 2;
       if (d < reach2 && d < bd * 0.5) { bd = d; best = i; }
     }
+    // Lost (far from the trail): re-find the nearest trail ahead so the rider can't wander.
+    if (bd > (width * 4) ** 2) {
+      for (let i = from; i < points.length; i++) {
+        const d = (points[i].x - x) ** 2 + (points[i].y - y) ** 2;
+        if (d < bd) { bd = d; best = i; }
+      }
+    }
     return best;
   };
 
+  // Finish line: across the trail at its end. Crossed once the rider is past it along the
+  // final direction of travel (and genuinely near the end of the trail).
+  const finishDir = at(length - 2);
+  const finishLine = {
+    x: points[points.length - 1].x, y: points[points.length - 1].y, tx: finishDir.tx, ty: finishDir.ty, half: width * 1.2,
+  };
+  const crossedFinish = (x, y, i) =>
+    points[i].d > length - width * 6 && (x - finishLine.x) * finishLine.tx + (y - finishLine.y) * finishLine.ty >= 0;
+
   return {
-    points, length, width, at, nearest,
+    points, length, width, at, nearest, finishLine, crossedFinish,
     start: points[0],
     end: points[points.length - 1],
-    span: narrow ? bw : bh,                          // extent of the box along the progress axis
+    span, unit,                                      // box extent along the progress axis; scale unit
     progressAt: (i) => points[Math.min(points.length - 1, i)].d / length,
   };
 }

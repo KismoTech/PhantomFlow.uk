@@ -84,7 +84,7 @@ export function createTerrain({ w, h, narrow, trail, rand }) {
     return RG[j * gw + i];
   };
 
-  /** Draw the map: contour lines (every 5th emphasised), the worn trail, and the finish posts. */
+  /** Draw the map: contour lines (every 5th emphasised), the worn trail, and the finish line. */
   const draw = (c) => {
     c.clearRect(0, 0, w, h);
     const step = (zhi - zlo) / (LEVELS + 1);
@@ -109,20 +109,24 @@ export function createTerrain({ w, h, narrow, trail, rand }) {
       }
       const major = k % 5 === 0;
       c.strokeStyle = rgba(COLOR.moss, major ? 0.32 : 0.15);
-      c.lineWidth = major ? 1.3 : 1;
+      c.lineWidth = (major ? 1.3 : 1) * Math.max(1, trail.unit * 0.8);
       c.stroke();
     }
 
     c.lineCap = "round"; c.lineJoin = "round";
     c.beginPath();
     trail.points.forEach((p, i) => (i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)));
+    const U = trail.unit;
     c.strokeStyle = rgba(COLOR.sand, 0.045); c.lineWidth = W * 1.4; c.stroke();
-    c.setLineDash([1, 8]); c.strokeStyle = rgba(COLOR.sand, 0.22); c.lineWidth = 1.4; c.stroke();
+    c.setLineDash([1 * U, 8 * U]); c.strokeStyle = rgba(COLOR.sand, 0.22); c.lineWidth = 1.4 * U; c.stroke();
     c.setLineDash([]);
 
-    const end = trail.end, tan = trail.at(trail.length - 2);
-    c.fillStyle = rgba(COLOR.sand, 0.55);
-    for (const o of [-7, 7]) { c.beginPath(); c.arc(end.x - tan.ty * o, end.y + tan.tx * o, 2, 0, Math.PI * 2); c.fill(); }
+    // finish line across the trail, with posts
+    const f = trail.finishLine, nx = -f.ty * f.half, ny = f.tx * f.half;
+    c.beginPath(); c.moveTo(f.x - nx, f.y - ny); c.lineTo(f.x + nx, f.y + ny);
+    c.setLineDash([3 * U, 3 * U]); c.strokeStyle = rgba(COLOR.sand, 0.6); c.lineWidth = 2 * U; c.stroke(); c.setLineDash([]);
+    c.fillStyle = rgba(COLOR.sand, 0.8);
+    for (const s of [-1, 1]) { c.beginPath(); c.arc(f.x + nx * s, f.y + ny * s, 2.5 * U, 0, Math.PI * 2); c.fill(); }
   };
 
   return { height, grad, rough, draw };
