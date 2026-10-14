@@ -145,7 +145,7 @@
   const FALL = 1.6, BANK = 0.45, CELL = 6;
   let Z = null, RG = null, gw = 0, gh = 0, zlo = 0, zhi = 1, mounds = [];
   const buildTerrain = (rand) => {
-    CW = Math.max(16, narrow ? (course.y1 - course.y0) * 0.16 : (course.x1 - course.x0) * 0.075);
+    CW = Math.max(18, narrow ? (course.y1 - course.y0) * 0.16 : (course.x1 - course.x0) * 0.095);
     // mounds: on or beside the line, so riders choose to take them or skirt them
     mounds = [];
     const count = narrow ? 3 : 5;
@@ -183,7 +183,7 @@
       for (const [cx, cy, s, a] of scenery) z += far * a * Math.exp(-((x - cx) ** 2 + (y - cy) ** 2) / (2 * s * s));
       for (const [cx, cy, s, a] of mounds) z += a * Math.exp(-((x - cx) ** 2 + (y - cy) ** 2) / (2 * s * s));
       Z[j * gw + i] = z;
-      RG[j * gw + i] = 1 - Math.exp(-d2 / (2 * (1.3 * CW) ** 2));
+      RG[j * gw + i] = 1 - Math.exp(-((Math.max(0, Math.sqrt(d2) - 0.7 * CW)) ** 2) / (2 * (1.1 * CW) ** 2)); // rough beyond the trail edge
       if (z < zlo) zlo = z; if (z > zhi) zhi = z;
     }
   };
@@ -250,7 +250,7 @@
   // Physics in course-relative units so it behaves the same at any size: gravity turns
   // height drop into speed (climbs cost it), descents steeper than the course fall only
   // partly pay back (braking, scrub), drag caps speed, grip limits speed through turns.
-  const PHYS = { gravity: 1.8, drag: 1.4, pedal: 0.18, grip: 5, downEff: 0.3, rough: 10, look: 0.07, guide: 0.9, wander: 0.4 };
+  const PHYS = { gravity: 1.8, drag: 1.4, pedal: 0.18, grip: 5, downEff: 0.3, rough: 4, inertia: 3, brake: 2.4, accel: 1.2, relief: 0.25, anticipate: 0.8, look: 0.07, guide: 0.9, wander: 0.4 };
   const BASE = () => course.len / 8; // speed reference; a run lands around 11 s
 
   let rider = null, phantom = null, best = null, flash = 0, flashAt = null, runNo = 0, runRand = null;
@@ -269,8 +269,14 @@
     let tx = end.x - r.x, ty = end.y - r.y; // "beeline" test policy: straight at the finish
     if (policy !== "beeline") {
       // pursue a point down the trail, offset by this run's line choice (inside/outside)
-      const goal = routeAt(route[r.ri].d + course.span * 0.08);
-      const off = n * PHYS.wander * r.line * CW * 0.8; // inside / outside line choice
+      // chase point: closer when slow so the rider follows hairpins instead of cutting across
+      const reach = Math.max(22, Math.min(course.span * 0.09, r.v * 0.3));
+      const here = routeAt(route[r.ri].d + 2), goal = routeAt(route[r.ri].d + reach);
+      const bend = 1 - (here.tx * goal.tx + here.ty * goal.ty); // 0 straight .. 2 hairpin
+      const offTrail = rough(r.x, r.y);
+      // inside / outside line choice, tightened in bends and dropped when off the trail
+      const swing = Math.max(-1, Math.min(1, n * PHYS.wander * r.line)); // stays within the trail width
+      const off = swing * CW * 0.6 * Math.max(0, 1 - bend * 1.5) * (1 - offTrail);
       const gx0 = goal.x - goal.ty * off - r.x, gy0 = goal.y + goal.tx * off - r.y;
       const gl0 = Math.hypot(gx0, gy0) || 1;
       const ux = gx0 / gl0, uy = gy0 / gl0;
@@ -287,6 +293,12 @@
         }
         const cost = climb * 8 + rgh * 0.6 + (1 - ca) * PHYS.guide;
         if (cost < bestCost) { bestCost = cost; tx = dx; ty = dy; }
+      }
+      if (offTrail > 0.45) { // lost the trail: head straight back onto it, a little ahead
+        const back = routeAt(route[r.ri].d + 16);
+        const bx = back.x - r.x, by = back.y - r.y, bl = Math.hypot(bx, by) || 1;
+        const k = (offTrail - 0.45) * 4;
+        tx += (bx / bl) * k; ty += (by / bl) * k;
       }
     }
     if (steer) {
@@ -306,19 +318,45 @@
     }
     const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
 
-    const ox = r.hx, oy = r.hy, rate = Math.min(1, dt * 3.4);
-    r.hx += (tx - r.hx) * rate; r.hy += (ty - r.hy) * rate;
+    // Smooth the chosen line first (riders commit to a line; they don't flick between
+    // candidates), then turn the bike toward it.
+    const sm = Math.min(1, dt * 5);
+    r.gx = (r.gx ?? tx) + (tx - (r.gx ?? tx)) * sm; r.gy = (r.gy ?? ty) + (ty - (r.gy ?? ty)) * sm;
+    const gl1 = Math.hypot(r.gx, r.gy) || 1;
+    const ox = r.hx, oy = r.hy, rate = Math.min(1, dt * (3.4 + 3 * Math.max(0, 1 - r.v / BASE()))); // sharper steering when slow
+    r.hx += (r.gx / gl1 - r.hx) * rate; r.hy += (r.gy / gl1 - r.hy) * rate;
     const hl = Math.hypot(r.hx, r.hy) || 1; r.hx /= hl; r.hy /= hl;
     const omega = Math.acos(Math.max(-1, Math.min(1, ox * r.hx + oy * r.hy))) / dt;
 
+    // Speed has momentum: the bike responds to the slope it's been riding, not every
+    // ripple under the wheel, and braking / acceleration are limited to rider-like rates.
     const B = BASE();
     const [gx, gy] = grad(r.x, r.y);
-    const slope = -(gx * r.hx + gy * r.hy) * course.len; // + downhill, in course-fall units
-    const eff = slope > FALL ? FALL + (slope - FALL) * PHYS.downEff : slope;
+    // The trail's own fall (along the direction of travel) plus the bumps, which are felt
+    // at reduced relief: the map shows them at full height, but the bike rides over them.
+    const tan = routeAt(route[r.ri].d + 2);
+    const fallHere = FALL * (r.hx * tan.tx + r.hy * tan.ty);
+    const slopeNow = fallHere + PHYS.relief * (-(gx * r.hx + gy * r.hy) * course.len - fallHere); // + downhill
+    r.sl = (r.sl ?? slopeNow) + (slopeNow - (r.sl ?? slopeNow)) * Math.min(1, dt * PHYS.inertia);
+    const eff = r.sl > FALL ? FALL + (r.sl - FALL) * PHYS.downEff : r.sl;
     const drag = PHYS.drag * (1 + PHYS.rough * rough(r.x, r.y)); // off the trail is slow going
-    r.v = Math.max(B * 0.3, r.v + (PHYS.gravity * B * eff - drag * r.v + PHYS.pedal * r.push * B) * dt);
+    let acc = PHYS.gravity * B * eff - drag * r.v + PHYS.pedal * r.push * B;
+    // grip: carrying too much speed into a turn means braking for it (at a braking rate)
     const aLatMax = PHYS.grip * r.push * B;
-    if (omega > 1e-3 && r.v * omega > aLatMax) r.v = Math.max(B * 0.3, aLatMax / omega);
+    if (omega > 1e-3 && r.v * omega > aLatMax) acc = Math.min(acc, (aLatMax / omega - r.v) * 6);
+    // look ahead along the trail and brake for the corner coming up (v² ≤ grip · radius)
+    for (const k of [0.5, 1]) {
+      const L = Math.max(20, r.v * PHYS.anticipate * k);
+      const t1 = routeAt(route[r.ri].d + 2), t2 = routeAt(route[r.ri].d + L);
+      const turn = Math.acos(Math.max(-1, Math.min(1, t1.tx * t2.tx + t1.ty * t2.ty)));
+      if (turn > 0.05) {
+        const vmax = Math.sqrt(aLatMax * (L / turn));
+        if (r.v > vmax) acc = Math.min(acc, (vmax - r.v) * 3);
+      }
+    }
+    if (r.dbg) Object.assign(r.dbg, { sl: r.sl, rough: rough(r.x, r.y), omega, acc: acc / B });
+    acc = Math.max(-PHYS.brake * B, Math.min(PHYS.accel * B, acc));
+    r.v = Math.max(B * 0.35, r.v + acc * dt);
     r.x += r.hx * r.v * dt; r.y += r.hy * r.v * dt; r.t += dt;
 
     const p = progressAt(r.ri);
