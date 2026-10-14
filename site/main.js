@@ -132,11 +132,20 @@
     const tx = b.x - a.x, ty = b.y - a.y, tl = Math.hypot(tx, ty) || 1;
     return { x: a.x + tx * k, y: a.y + ty * k, tx: tx / tl, ty: ty / tl, i: lo };
   };
-  const nearestOnRoute = (x, y, from) => { // search forward from a hint index
+  const nearestOnRoute = (x, y, from) => {
+    // Local search first (normal riding)...
     let best = from, bd = Infinity;
-    for (let i = Math.max(0, from - 3); i < Math.min(route.length, from + 14); i++) { // narrow window: never jump to a nearby switchback
+    for (let i = Math.max(0, from - 3); i < Math.min(route.length, from + 14); i++) {
       const d = (route[i].x - x) ** 2 + (route[i].y - y) ** 2;
       if (d < bd) { bd = d; best = i; }
+    }
+    // ...then, after a shortcut, jump forward to where the rider has actually rejoined:
+    // only within ~260 px of trail ahead, only if genuinely close to that later point, and
+    // only if clearly closer than the local match (so nearby switchbacks aren't skipped).
+    const limit = route[from].d + 200, reach2 = (CW * 1.1) ** 2;
+    for (let i = from + 14; i < route.length && route[i].d < limit; i++) {
+      const d = (route[i].x - x) ** 2 + (route[i].y - y) ** 2;
+      if (d < reach2 && d < bd * 0.5) { bd = d; best = i; }
     }
     return best;
   };
@@ -273,7 +282,16 @@
       // pursue a point down the trail, offset by this run's line choice (inside/outside)
       // chase point: closer when slow so the rider follows hairpins instead of cutting across
       const reach = Math.max(22, Math.min(course.span * 0.09, r.v * 0.3));
-      const here = routeAt(route[r.ri].d + 2), goal = routeAt(route[r.ri].d + reach);
+      // aim at the furthest trail point within reach of where the rider actually is: after
+      // (or during) a shortcut that's the later section, so the rider never turns back
+      let aimD = route[r.ri].d + reach;
+      const window = reach * 1.6 + 70 * (r.pull || 0); // riders follow the loops; the pointer can cut more
+      for (let i = r.ri; i < route.length && route[i].d < route[r.ri].d + window; i++) {
+        if ((route[i].x - r.x) ** 2 + (route[i].y - r.y) ** 2 <= reach * reach) aimD = Math.max(aimD, route[i].d);
+      }
+      aimD = Math.max(aimD, r.aimD ?? 0); // the target only ever moves on down the trail
+      r.aimD = aimD;
+      const here = routeAt(route[r.ri].d + 2), goal = routeAt(aimD);
       const bend = 1 - (here.tx * goal.tx + here.ty * goal.ty); // 0 straight .. 2 hairpin
       const offTrail = rough(r.x, r.y);
       // inside / outside line choice, tightened in bends and dropped when off the trail
@@ -287,12 +305,12 @@
         if (d < 280) {
           const side = (pointer.x - goal.x) * -goal.ty + (pointer.y - goal.y) * goal.tx;
           pull = Math.min(1, (1 - d / 280) * 2);
-          off = off * (1 - pull) + Math.max(-1.7 * CW, Math.min(1.7 * CW, side)) * pull;
+          off = off * (1 - pull) + Math.max(-1.4 * CW, Math.min(1.4 * CW, side)) * pull;
         }
       }
       // commit to a line smoothly: the allowance off the trail eases in and out
       r.pull = (r.pull ?? 0) + (pull - (r.pull ?? 0)) * Math.min(1, dt * 2.5);
-      reachOut = r.pull * 1.7 * CW;
+      reachOut = r.pull * 1.4 * CW;
       const gx0 = goal.x - goal.ty * off - r.x, gy0 = goal.y + goal.tx * off - r.y;
       const gl0 = Math.hypot(gx0, gy0) || 1;
       const ux = gx0 / gl0, uy = gy0 / gl0;
@@ -313,7 +331,7 @@
       // trail magnet: beyond the trail edge, steer back on with growing force
       const near = route[r.ri], dTrail = Math.hypot(near.x - r.x, near.y - r.y);
       if (dTrail > CW * 0.7 + reachOut) {
-        const back = routeAt(near.d + Math.max(10, r.v * 0.12));
+        const back = routeAt(Math.max(near.d + Math.max(10, r.v * 0.12), (r.aimD ?? 0) - 20)); // rejoin ahead, never behind
         const bx = back.x - r.x, by = back.y - r.y, bl = Math.hypot(bx, by) || 1;
         const k = Math.min(4, ((dTrail - CW * 0.7 - reachOut) / CW) * 3);
         tx += (bx / bl) * k; ty += (by / bl) * k;
@@ -327,7 +345,7 @@
     if (r.y < course.y0 + m) ty += ((course.y0 + m - r.y) / m) * 2;
     if (r.y > course.y1 - m) ty -= ((r.y - course.y1 + m) / m) * 2;
     if (policy !== "beeline") {
-      const tan = routeAt(route[r.ri].d + 4), along = tx * tan.tx + ty * tan.ty;
+      const tan = routeAt(r.aimD ?? route[r.ri].d + 4), along = tx * tan.tx + ty * tan.ty;
       if (along < 0.15) { tx += tan.tx * (0.15 - along); ty += tan.ty * (0.15 - along); }
     }
     const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
@@ -348,7 +366,7 @@
     const [gx, gy] = grad(r.x, r.y);
     // Gravity comes from the terrain itself: the real slope of the ground in the direction
     // ridden. The trail has no special status; it's simply where the ground is kindest.
-    const commit = 1 - 0.6 * (r.pull || 0); // a chosen cut is ridden as a line: the rough bites less
+    const commit = 1 - 0.35 * (r.pull || 0); // a chosen cut is ridden as a line: the rough bites a bit less
     const slopeNow = -(gx * r.hx + gy * r.hy) * course.len; // + downhill
     r.sl = (r.sl ?? slopeNow) + (slopeNow - (r.sl ?? slopeNow)) * Math.min(1, dt * PHYS.inertia);
     const eff = r.sl > FALL ? FALL + (r.sl - FALL) * PHYS.downEff : r.sl;
