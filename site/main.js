@@ -251,7 +251,7 @@
   // height drop into speed (climbs cost it), descents steeper than the course fall only
   // partly pay back (braking, scrub), drag caps speed, grip limits speed through turns.
   const PHYS = { gravity: 1.8, drag: 1.4, pedal: 0.18, grip: 5, downEff: 0.3, rough: 4, inertia: 3, brake: 2.4, accel: 1.2, relief: 0.25, anticipate: 0.8, look: 0.07, guide: 0.9, wander: 0.4 };
-  const BASE = () => course.len / 8; // speed reference; a run lands around 11 s
+  const BASE = () => course.len / 9.6; // speed reference; a run lands around 10-11 s
 
   let rider = null, phantom = null, best = null, flash = 0, flashAt = null, runNo = 0, runRand = null;
   const newRider = (seed) => ({
@@ -259,7 +259,7 @@
     pts: [{ x: course.sx, y: course.sy, t: 0, p: 0 }],
     ph: [seed * 1.7, seed * 2.9 + 1, seed * 0.6 + 2],
     ...(() => { const rr = mulberry(Math.floor(seed * 1e4) + 7); // this run's rider personality
-      return { line: 0.4 + rr() * 1.4, push: 0.9 + rr() * 0.2 }; })(),
+      return { line: 0.4 + rr() * 1.4, push: 0.86 + rr() * 0.26 }; })(),
   });
 
   const stepRider = (r, dt, steer, policy) => {
@@ -275,8 +275,22 @@
       const bend = 1 - (here.tx * goal.tx + here.ty * goal.ty); // 0 straight .. 2 hairpin
       const offTrail = rough(r.x, r.y);
       // inside / outside line choice, tightened in bends and dropped when off the trail
-      const swing = Math.max(-1, Math.min(1, n * PHYS.wander * r.line)); // stays within the trail width
+      let swing = Math.max(-1, Math.min(1, n * PHYS.wander * r.line)); // stays within the trail width
+      r.aim = null;
+      if (steer) {
+        // The pointer picks the LINE, not the direction: its side of the trail (projected
+        // onto the trail normal) sets how tight or wide you ride. The bike stays on the trail.
+        const d = Math.hypot(pointer.x - r.x, pointer.y - r.y);
+        if (d < 280) {
+          const side = (pointer.x - goal.x) * -goal.ty + (pointer.y - goal.y) * goal.tx;
+          const want = Math.max(-1, Math.min(1, side / (CW * 0.6)));
+          const k = Math.min(1, (1 - d / 280) * 2);
+          swing = swing * (1 - k) + want * k;
+          r.aim = { k };
+        }
+      }
       const off = swing * CW * 0.6 * Math.max(0, 1 - bend * 1.5) * (1 - offTrail);
+      if (r.aim) Object.assign(r.aim, { x: goal.x - goal.ty * off, y: goal.y + goal.tx * off });
       const gx0 = goal.x - goal.ty * off - r.x, gy0 = goal.y + goal.tx * off - r.y;
       const gl0 = Math.hypot(gx0, gy0) || 1;
       const ux = gx0 / gl0, uy = gy0 / gl0;
@@ -294,16 +308,14 @@
         const cost = climb * 8 + rgh * 0.6 + (1 - ca) * PHYS.guide;
         if (cost < bestCost) { bestCost = cost; tx = dx; ty = dy; }
       }
-      if (offTrail > 0.45) { // lost the trail: head straight back onto it, a little ahead
-        const back = routeAt(route[r.ri].d + 16);
+      // trail magnet: beyond the trail edge, steer back on with growing force
+      const near = route[r.ri], dTrail = Math.hypot(near.x - r.x, near.y - r.y);
+      if (dTrail > CW * 0.7) {
+        const back = routeAt(near.d + Math.max(10, r.v * 0.12));
         const bx = back.x - r.x, by = back.y - r.y, bl = Math.hypot(bx, by) || 1;
-        const k = (offTrail - 0.45) * 4;
+        const k = Math.min(4, ((dTrail - CW * 0.7) / CW) * 3);
         tx += (bx / bl) * k; ty += (by / bl) * k;
       }
-    }
-    if (steer) {
-      const dx = pointer.x - r.x, dy = pointer.y - r.y, d = Math.hypot(dx, dy);
-      if (d < 260 && d > 4) { const k = (1 - d / 260) * 2.4; tx += (dx / d) * k; ty += (dy / d) * k; }
     }
     { const tl0 = Math.hypot(tx, ty) || 1; tx /= tl0; ty /= tl0; }
     // soft walls on the course box, and never ride back against the trail direction
@@ -320,10 +332,10 @@
 
     // Smooth the chosen line first (riders commit to a line; they don't flick between
     // candidates), then turn the bike toward it.
-    const sm = Math.min(1, dt * 5);
+    const sm = Math.min(1, dt * 10);
     r.gx = (r.gx ?? tx) + (tx - (r.gx ?? tx)) * sm; r.gy = (r.gy ?? ty) + (ty - (r.gy ?? ty)) * sm;
     const gl1 = Math.hypot(r.gx, r.gy) || 1;
-    const ox = r.hx, oy = r.hy, rate = Math.min(1, dt * (3.4 + 3 * Math.max(0, 1 - r.v / BASE()))); // sharper steering when slow
+    const ox = r.hx, oy = r.hy, rate = Math.min(1, dt * (5 + 4 * Math.max(0, 1 - r.v / BASE()))); // sharper steering when slow
     r.hx += (r.gx / gl1 - r.hx) * rate; r.hy += (r.gy / gl1 - r.hy) * rate;
     const hl = Math.hypot(r.hx, r.hy) || 1; r.hx /= hl; r.hy /= hl;
     const omega = Math.acos(Math.max(-1, Math.min(1, ox * r.hx + oy * r.hy))) / dt;
@@ -345,12 +357,12 @@
     const aLatMax = PHYS.grip * r.push * B;
     if (omega > 1e-3 && r.v * omega > aLatMax) acc = Math.min(acc, (aLatMax / omega - r.v) * 6);
     // look ahead along the trail and brake for the corner coming up (v² ≤ grip · radius)
-    for (const k of [0.5, 1]) {
+    for (const k of [0.35, 0.7, 1]) {
       const L = Math.max(20, r.v * PHYS.anticipate * k);
       const t1 = routeAt(route[r.ri].d + 2), t2 = routeAt(route[r.ri].d + L);
       const turn = Math.acos(Math.max(-1, Math.min(1, t1.tx * t2.tx + t1.ty * t2.ty)));
       if (turn > 0.05) {
-        const vmax = Math.sqrt(aLatMax * (L / turn));
+        const vmax = (0.62 + 0.28 * (r.push - 0.86) / 0.26) * Math.sqrt(aLatMax * (L / turn)); // braver riders carry more
         if (r.v > vmax) acc = Math.min(acc, (vmax - r.v) * 3);
       }
     }
@@ -406,7 +418,7 @@
     startRace();
   };
   if (/[?&]debug\b/.test(location.search)) {
-    window.__pf = { PHYS, simulateRun, stepRider, newRider, course, BASE, height, grad, SEED, get route() { return route; } };
+    window.__pf = { PHYS, simulateRun, stepRider, newRider, course, BASE, height, grad, SEED, pointer: () => pointer, get route() { return route; } };
   }
 
   // ── Flow particles ──
@@ -505,6 +517,14 @@
     c.shadowBlur = 0;
     if (ph) drawRider(c, ph, "#E9E2D2", "rgba(233,226,210,0.14)");
     drawRider(c, rider, "#F3EEE3", "rgba(226,96,44,0.35)");
+    if (rider.aim && !rider.done) { // the line you're asking for
+      c.globalAlpha = fade * (0.35 + 0.65 * rider.aim.k);
+      c.beginPath(); c.arc(rider.aim.x, rider.aim.y, 6, 0, Math.PI * 2);
+      c.strokeStyle = "#E2602C"; c.lineWidth = 1.5; c.stroke();
+      c.beginPath(); c.moveTo(rider.x, rider.y); c.lineTo(rider.aim.x, rider.aim.y);
+      c.setLineDash([2, 4]); c.strokeStyle = "rgba(226,96,44,0.55)"; c.lineWidth = 1; c.stroke(); c.setLineDash([]);
+      c.globalAlpha = fade;
+    }
     c.beginPath(); c.arc(course.sx, course.sy, 3.2, 0, Math.PI * 2); c.fillStyle = "#E2602C"; c.fill(); // start gate
     if (flashAt) {
       c.font = "600 11px 'IBM Plex Mono', ui-monospace, monospace";
