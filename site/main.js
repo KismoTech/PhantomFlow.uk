@@ -142,7 +142,7 @@
   };
 
   // ── Height grid built around the route ──
-  const FALL = 1.6, BANK = 0.45, CELL = 6;
+  const FALL = 1.6, BANK = 0.14, CELL = 6;
   let Z = null, RG = null, gw = 0, gh = 0, zlo = 0, zhi = 1, mounds = [];
   const buildTerrain = (rand) => {
     CW = Math.max(18, narrow ? (course.y1 - course.y0) * 0.16 : (course.x1 - course.x0) * 0.095);
@@ -152,7 +152,7 @@
     for (let i = 0; i < count; i++) {
       const at = routeAt(routeLen * (0.14 + (0.76 * (i + 0.2 + rand() * 0.6)) / count));
       const off = (rand() - 0.5) * 1.3 * CW;
-      mounds.push([at.x - at.ty * off, at.y + at.tx * off, CW * (0.75 + rand() * 0.35), 0.12 + rand() * 0.08]);
+      mounds.push([at.x - at.ty * off, at.y + at.tx * off, CW * (0.75 + rand() * 0.35), 0.035 + rand() * 0.03]);
     }
     const scenery = [];
     for (let i = 0; i < 6; i++) scenery.push([rand() * w, rand() * h, S * (0.07 + rand() * 0.12), 0.25 + rand() * 0.4]);
@@ -187,11 +187,13 @@
       if (z < zlo) zlo = z; if (z > zhi) zhi = z;
     }
   };
-  const height = (x, y) => {
+  const sample = (G, x, y) => {
     const fx = Math.max(0, Math.min(gw - 1.001, x / CELL)), fy = Math.max(0, Math.min(gh - 1.001, y / CELL));
     const i = fx | 0, j = fy | 0, u = fx - i, v = fy - j, k = j * gw + i;
-    return (Z[k] * (1 - u) + Z[k + 1] * u) * (1 - v) + (Z[k + gw] * (1 - u) + Z[k + gw + 1] * u) * v;
+    return (G[k] * (1 - u) + G[k + 1] * u) * (1 - v) + (G[k + gw] * (1 - u) + G[k + gw + 1] * u) * v;
   };
+  const height = (x, y) => sample(Z, x, y);
+
   const rough = (x, y) => {
     const i = Math.max(0, Math.min(gw - 1, Math.round(x / CELL))), j = Math.max(0, Math.min(gh - 1, Math.round(y / CELL)));
     return RG[j * gw + i];
@@ -211,7 +213,7 @@
   const drawTerrain = () => {
     const c = ctx.terrain;
     c.clearRect(0, 0, w, h);
-    const LEVELS = 26, step = (zhi - zlo) / (LEVELS + 1);
+    const LEVELS = 44, step = (zhi - zlo) / (LEVELS + 1);
     const lerp = (a, b, l) => (l - a) / (b - a);
     for (let k = 1; k <= LEVELS; k++) {
       const l = zlo + k * step;
@@ -250,7 +252,7 @@
   // Physics in course-relative units so it behaves the same at any size: gravity turns
   // height drop into speed (climbs cost it), descents steeper than the course fall only
   // partly pay back (braking, scrub), drag caps speed, grip limits speed through turns.
-  const PHYS = { gravity: 1.8, drag: 1.4, pedal: 0.18, grip: 5, downEff: 0.3, rough: 4, inertia: 3, brake: 2.4, accel: 1.2, relief: 0.25, anticipate: 0.8, look: 0.07, guide: 0.9, wander: 0.4 };
+  const PHYS = { gravity: 1.8, drag: 1.4, pedal: 0.18, grip: 5, downEff: 0.3, rough: 4, inertia: 3, brake: 2.4, accel: 1.2, anticipate: 0.8, look: 0.07, guide: 0.9, wander: 0.4 };
   const BASE = () => course.len / 9.6; // speed reference; a run lands around 10-11 s
 
   let rider = null, phantom = null, best = null, flash = 0, flashAt = null, runNo = 0, runRand = null;
@@ -275,22 +277,22 @@
       const bend = 1 - (here.tx * goal.tx + here.ty * goal.ty); // 0 straight .. 2 hairpin
       const offTrail = rough(r.x, r.y);
       // inside / outside line choice, tightened in bends and dropped when off the trail
-      let swing = Math.max(-1, Math.min(1, n * PHYS.wander * r.line)); // stays within the trail width
-      r.aim = null;
+      let off = Math.max(-1, Math.min(1, n * PHYS.wander * r.line)) * CW * 0.6 * Math.max(0, 1 - bend * 1.5) * (1 - offTrail);
+      let pull = 0, reachOut = 0;
       if (steer) {
-        // The pointer picks the LINE, not the direction: its side of the trail (projected
-        // onto the trail normal) sets how tight or wide you ride. The bike stays on the trail.
+        // The pointer picks the line: its side of the trail sets how tight or wide you ride,
+        // up to about a trail-width beyond the edge, so you can cut a corner through the rough
+        // (shorter, but slower going: your call).
         const d = Math.hypot(pointer.x - r.x, pointer.y - r.y);
         if (d < 280) {
           const side = (pointer.x - goal.x) * -goal.ty + (pointer.y - goal.y) * goal.tx;
-          const want = Math.max(-1, Math.min(1, side / (CW * 0.6)));
-          const k = Math.min(1, (1 - d / 280) * 2);
-          swing = swing * (1 - k) + want * k;
-          r.aim = { k };
+          pull = Math.min(1, (1 - d / 280) * 2);
+          off = off * (1 - pull) + Math.max(-1.7 * CW, Math.min(1.7 * CW, side)) * pull;
         }
       }
-      const off = swing * CW * 0.6 * Math.max(0, 1 - bend * 1.5) * (1 - offTrail);
-      if (r.aim) Object.assign(r.aim, { x: goal.x - goal.ty * off, y: goal.y + goal.tx * off });
+      // commit to a line smoothly: the allowance off the trail eases in and out
+      r.pull = (r.pull ?? 0) + (pull - (r.pull ?? 0)) * Math.min(1, dt * 2.5);
+      reachOut = r.pull * 1.7 * CW;
       const gx0 = goal.x - goal.ty * off - r.x, gy0 = goal.y + goal.tx * off - r.y;
       const gl0 = Math.hypot(gx0, gy0) || 1;
       const ux = gx0 / gl0, uy = gy0 / gl0;
@@ -305,15 +307,15 @@
           const px = r.x + dx * look * k / 3, py = r.y + dy * look * k / 3, z = height(px, py);
           climb += Math.max(0, z - prev); prev = z; rgh += rough(px, py);
         }
-        const cost = climb * 8 + rgh * 0.6 + (1 - ca) * PHYS.guide;
+        const cost = climb * 8 + rgh * 0.6 * (1 - 0.8 * pull) + (1 - ca) * PHYS.guide; // the pointer accepts some rough
         if (cost < bestCost) { bestCost = cost; tx = dx; ty = dy; }
       }
       // trail magnet: beyond the trail edge, steer back on with growing force
       const near = route[r.ri], dTrail = Math.hypot(near.x - r.x, near.y - r.y);
-      if (dTrail > CW * 0.7) {
+      if (dTrail > CW * 0.7 + reachOut) {
         const back = routeAt(near.d + Math.max(10, r.v * 0.12));
         const bx = back.x - r.x, by = back.y - r.y, bl = Math.hypot(bx, by) || 1;
-        const k = Math.min(4, ((dTrail - CW * 0.7) / CW) * 3);
+        const k = Math.min(4, ((dTrail - CW * 0.7 - reachOut) / CW) * 3);
         tx += (bx / bl) * k; ty += (by / bl) * k;
       }
     }
@@ -344,14 +346,13 @@
     // ripple under the wheel, and braking / acceleration are limited to rider-like rates.
     const B = BASE();
     const [gx, gy] = grad(r.x, r.y);
-    // The trail's own fall (along the direction of travel) plus the bumps, which are felt
-    // at reduced relief: the map shows them at full height, but the bike rides over them.
-    const tan = routeAt(route[r.ri].d + 2);
-    const fallHere = FALL * (r.hx * tan.tx + r.hy * tan.ty);
-    const slopeNow = fallHere + PHYS.relief * (-(gx * r.hx + gy * r.hy) * course.len - fallHere); // + downhill
+    // Gravity comes from the terrain itself: the real slope of the ground in the direction
+    // ridden. The trail has no special status; it's simply where the ground is kindest.
+    const commit = 1 - 0.6 * (r.pull || 0); // a chosen cut is ridden as a line: the rough bites less
+    const slopeNow = -(gx * r.hx + gy * r.hy) * course.len; // + downhill
     r.sl = (r.sl ?? slopeNow) + (slopeNow - (r.sl ?? slopeNow)) * Math.min(1, dt * PHYS.inertia);
     const eff = r.sl > FALL ? FALL + (r.sl - FALL) * PHYS.downEff : r.sl;
-    const drag = PHYS.drag * (1 + PHYS.rough * rough(r.x, r.y)); // off the trail is slow going
+    const drag = PHYS.drag * (1 + PHYS.rough * commit * rough(r.x, r.y)); // off the trail is slow going
     let acc = PHYS.gravity * B * eff - drag * r.v + PHYS.pedal * r.push * B;
     // grip: carrying too much speed into a turn means braking for it (at a braking rate)
     const aLatMax = PHYS.grip * r.push * B;
@@ -517,14 +518,6 @@
     c.shadowBlur = 0;
     if (ph) drawRider(c, ph, "#E9E2D2", "rgba(233,226,210,0.14)");
     drawRider(c, rider, "#F3EEE3", "rgba(226,96,44,0.35)");
-    if (rider.aim && !rider.done) { // the line you're asking for
-      c.globalAlpha = fade * (0.35 + 0.65 * rider.aim.k);
-      c.beginPath(); c.arc(rider.aim.x, rider.aim.y, 6, 0, Math.PI * 2);
-      c.strokeStyle = "#E2602C"; c.lineWidth = 1.5; c.stroke();
-      c.beginPath(); c.moveTo(rider.x, rider.y); c.lineTo(rider.aim.x, rider.aim.y);
-      c.setLineDash([2, 4]); c.strokeStyle = "rgba(226,96,44,0.55)"; c.lineWidth = 1; c.stroke(); c.setLineDash([]);
-      c.globalAlpha = fade;
-    }
     c.beginPath(); c.arc(course.sx, course.sy, 3.2, 0, Math.PI * 2); c.fillStyle = "#E2602C"; c.fill(); // start gate
     if (flashAt) {
       c.font = "600 11px 'IBM Plex Mono', ui-monospace, monospace";
