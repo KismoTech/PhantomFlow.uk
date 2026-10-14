@@ -8,6 +8,9 @@ import { createTerrain } from "./terrain.js";
 import { createRace, replayAt, timeAtProgress, PHYS } from "./race.js";
 
 const STEP = 1 / 120;          // fixed physics step, so live runs match simulated ones
+const MIN_FRAME_MS = 1000 / 60 - 1.5; // render at most ~60 fps (physics and flow are time-based)
+const BUDGET_MS = 6;           // per-frame work above this sheds particles (slow devices)
+const MIN_PARTICLES = 300;
 const HOLD = 1.8;              // seconds the finish result stays up
 const NARROW = 900;            // px: below this the race runs through a band under the buttons
 const REVEAL_SETTLE_MS = 1300; // the hero copy's reveal transition; the phone band is final after it
@@ -37,7 +40,7 @@ function initHero(hero) {
   let w = 0, h = 0, narrow = false;
   let trail, terrain, race, box;
   let rider, phantom, best, result, runNo = 0, runRand;
-  let particles = [];
+  let particles = [], particleTarget = 0;
 
   // ── Layout: where the race may run ──
   const courseBox = () => {
@@ -95,7 +98,8 @@ function initHero(hero) {
     for (const k in layers) fitCanvas(layers[k], ctx[k], w, h);
     build();
     // fixed-size streaks, so keep the same density per pixel (more of them on big screens)
-    particles = Array.from({ length: Math.min(2200, Math.round((w * h) / 1000)) }, () => spawn());
+    particleTarget = Math.min(2200, Math.round((w * h) / 1000));
+    particles = Array.from({ length: particleTarget }, () => spawn());
     ctx.flow.fillStyle = COLOR.forest;
     ctx.flow.fillRect(0, 0, w, h);
   };
@@ -115,18 +119,17 @@ function initHero(hero) {
   // Particles follow the contours (perpendicular to the gradient) and drift downhill; the
   // pointer swirls them and the rider leaves a wake.
   // Time-based (not per frame), so the flow looks the same at 60, 144 or 240 Hz.
+  const STREAK = { moss: rgba(COLOR.moss, 0.42), oxide: rgba(COLOR.oxide, 0.46) };
   const drawFlow = (dt) => {
     const f = ctx.flow;
     const k = Math.max(0.25, Math.min(3, dt * 60)); // elapsed time in 60 Hz frames
     f.fillStyle = rgba(COLOR.forest, 1 - Math.pow(1 - 0.08, k)); // trails fade at a fixed rate per second
     f.fillRect(0, 0, w, h);
-    const U = trail.unit;
-    f.lineWidth = 1.28; // fine texture: a fixed pixel size at any screen size (motion still scales)
+    const U = trail.unit, { FX, FY, cell } = terrain.flow;
+    const moss = new Path2D(), oxide = new Path2D(); // two batched strokes instead of one per particle
     for (const p of particles) {
-      const [gx, gy] = terrain.grad(p.x, p.y);
-      const gl = Math.hypot(gx, gy) || 1;
-      let vx = ((gy / gl) * 1.25 - (gx / gl) * 0.3) * U;
-      let vy = ((-gx / gl) * 1.25 - (gy / gl) * 0.3) * U;
+      const c = cell(p.x, p.y);
+      let vx = FX[c] * U, vy = FY[c] * U;
       if (pointer.active) {
         const dx = p.x - pointer.x, dy = p.y - pointer.y, d = Math.hypot(dx, dy);
         if (d < 190 * U) { const k = (1 - d / (190 * U)) * 2.6 * U; vx += (-dy / (d + 1)) * k; vy += (dx / (d + 1)) * k; }
@@ -135,14 +138,18 @@ function initHero(hero) {
         const rd = Math.hypot(p.x - rider.x, p.y - rider.y);
         if (rd < 90 * U) { const k = (1 - rd / (90 * U)) * 2.2 * U; vx += rider.hx * k; vy += rider.hy * k; }
       }
-      f.strokeStyle = p.oxide ? rgba(COLOR.oxide, 0.46) : rgba(COLOR.moss, 0.42);
       vx *= k; vy *= k;
-      f.beginPath(); f.moveTo(p.x, p.y); f.lineTo(p.x + vx, p.y + vy); f.stroke();
+      const path = p.oxide ? oxide : moss;
+      path.moveTo(p.x, p.y); path.lineTo(p.x + vx, p.y + vy);
       p.x += vx; p.y += vy;
       if ((p.life -= k) < 0 || p.x < -5 || p.x > w + 5 || p.y < -5 || p.y > h + 5) spawn(p);
     }
+    f.lineWidth = 1.28; // fine texture: a fixed pixel size at any screen size (motion still scales)
+    f.strokeStyle = STREAK.moss; f.stroke(moss);
+    f.strokeStyle = STREAK.oxide; f.stroke(oxide);
   };
 
+  const GLOW = rgba(COLOR.oxide, 0.16);
   const drawRun = (fade) => {
     const c = ctx.run, U = trail.unit;
     c.clearRect(0, 0, w, h);
@@ -156,10 +163,9 @@ function initHero(hero) {
       strokePath(c, phantom.pts, ph.i, ph); c.stroke();
       c.setLineDash([]);
     }
-    c.lineWidth = 3 * U; c.strokeStyle = COLOR.oxide;
-    c.shadowColor = rgba(COLOR.oxide, 0.5); c.shadowBlur = 10 * U;
-    strokePath(c, rider.pts, rider.pts.length - 1, rider); c.stroke();
-    c.shadowBlur = 0;
+    strokePath(c, rider.pts, rider.pts.length - 1, rider);
+    c.lineWidth = 9 * U; c.strokeStyle = GLOW; c.stroke(); // soft glow (cheaper than shadowBlur)
+    c.lineWidth = 3 * U; c.strokeStyle = COLOR.oxide; c.stroke();
     if (ph) dot(c, ph, COLOR.sand, rgba(COLOR.sand, 0.14));
     dot(c, rider, COLOR.sandLight, rgba(COLOR.oxide, 0.35));
     c.beginPath(); c.arc(trail.start.x, trail.start.y, 3.2 * U, 0, Math.PI * 2); c.fillStyle = COLOR.oxide; c.fill();
@@ -175,16 +181,16 @@ function initHero(hero) {
     c.restore();
   };
 
+  const setText = (el, s) => { if (!el || el.textContent === s) return false; el.textContent = s; return true; };
   let lastHud = 0;
   const updateHud = (now) => {
     if (now - lastHud < 120) return;
     lastHud = now;
     const p = Math.min(0.999, trail.progressAt(rider.ri));
     const delta = phantom ? rider.t - timeAtProgress(phantom, p) : 0; // + means behind the phantom
-    if (hud.sector) hud.sector.textContent = `S${1 + Math.floor(p * 4)}`;
-    if (hud.speed) hud.speed.textContent = `${(16 + (rider.v / race.BASE) * 18).toFixed(1)} km/h`;
-    if (hud.delta) {
-      hud.delta.textContent = formatDelta(delta);
+    setText(hud.sector, `S${1 + Math.floor(p * 4)}`);
+    setText(hud.speed, `${(16 + (rider.v / race.BASE) * 18).toFixed(1)} km/h`);
+    if (setText(hud.delta, formatDelta(delta))) {
       hud.delta.classList.toggle("ahead", delta < 0);
       hud.delta.classList.toggle("behind", delta >= 0);
     }
@@ -192,7 +198,11 @@ function initHero(hero) {
 
   // ── Loop ──
   let last = performance.now(), lag = 0, hold = 0, raf = 0;
+  const stats = { workMs: 0, frames: 0 };
   const frame = (now) => {
+    raf = requestAnimationFrame(frame);
+    if (now - last < MIN_FRAME_MS) return; // high-refresh screens: skip to ~60 fps
+    const t0 = performance.now();
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     if (!rider.done) {
@@ -210,7 +220,12 @@ function initHero(hero) {
     drawFlow(dt);
     drawRun(fade);
     updateHud(now);
-    if (!REDUCED_MOTION) raf = requestAnimationFrame(frame);
+    stats.workMs += (performance.now() - t0 - stats.workMs) * 0.05; stats.frames++;
+    // adaptive quality: a device that can't keep up sheds particles (and regains them later)
+    if (stats.frames % 30 === 0) {
+      if (stats.workMs > BUDGET_MS && particles.length > MIN_PARTICLES) particles.length = Math.max(MIN_PARTICLES, Math.round(particles.length * 0.8));
+      else if (stats.workMs < BUDGET_MS / 3 && particles.length < particleTarget) particles.push(...Array.from({ length: Math.min(50, particleTarget - particles.length) }, () => spawn()));
+    }
   };
 
   // ── Input and lifecycle ──
@@ -234,16 +249,23 @@ function initHero(hero) {
   });
 
   if (/[?&]debug\b/.test(location.search)) { // tuning hook
-    window.__pf = { PHYS, SEED, pointer, get race() { return race; }, get trail() { return trail; }, get terrain() { return terrain; } };
+    window.__pf = { PHYS, SEED, pointer, stats, particles: () => particles.length, get race() { return race; }, get trail() { return trail; }, get terrain() { return terrain; } };
   }
 
   if (REDUCED_MOTION) { // a single still frame, mid-run
     for (let i = 0; i < 800 && !rider.done; i++) race.step(rider, STEP, null);
+    last = performance.now() - 1000 / 60;
     frame(performance.now());
+    cancelAnimationFrame(raf);
     return;
   }
-  raf = requestAnimationFrame(frame);
-  whenVisible(hero,
-    () => { cancelAnimationFrame(raf); last = performance.now(); raf = requestAnimationFrame(frame); },
-    () => cancelAnimationFrame(raf));
+
+  // Run only while the hero is on screen AND the tab is visible.
+  let onScreen = false;
+  const play = () => {
+    cancelAnimationFrame(raf);
+    if (onScreen && !document.hidden) { last = performance.now(); raf = requestAnimationFrame(frame); }
+  };
+  whenVisible(hero, () => { onScreen = true; play(); }, () => { onScreen = false; play(); });
+  document.addEventListener("visibilitychange", play);
 }

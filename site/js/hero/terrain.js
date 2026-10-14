@@ -129,5 +129,18 @@ export function createTerrain({ w, h, narrow, trail, rand }) {
     for (const s of [-1, 1]) { c.beginPath(); c.arc(f.x + nx * s, f.y + ny * s, 2.5 * U, 0, Math.PI * 2); c.fill(); }
   };
 
-  return { height, grad, rough, draw };
+  // Flow field for the particles, precomputed once: along the contours (perpendicular to the
+  // gradient) with a slight downhill drift. One lookup per particle per frame.
+  const FX = new Float32Array(gw * gh), FY = new Float32Array(gw * gh);
+  for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+    const k = j * gw + i;
+    const gx = (Z[j * gw + Math.min(gw - 1, i + 1)] - Z[j * gw + Math.max(0, i - 1)]);
+    const gy = (Z[Math.min(gh - 1, j + 1) * gw + i] - Z[Math.max(0, j - 1) * gw + i]);
+    const gl = Math.hypot(gx, gy) || 1;
+    FX[k] = (gy / gl) * 1.25 - (gx / gl) * 0.3;
+    FY[k] = (-gx / gl) * 1.25 - (gy / gl) * 0.3;
+  }
+  const cell = (x, y) => Math.max(0, Math.min(gh - 1, Math.round(y / CELL))) * gw + Math.max(0, Math.min(gw - 1, Math.round(x / CELL)));
+
+  return { height, grad, rough, draw, flow: { FX, FY, cell } };
 }
