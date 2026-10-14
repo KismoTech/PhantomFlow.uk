@@ -11,6 +11,7 @@ const STEP = 1 / 120;          // fixed physics step, so live runs match simulat
 const HOLD = 1.8;              // seconds the finish result stays up
 const NARROW = 900;            // px: below this the race runs through a band under the buttons
 const REVEAL_SETTLE_MS = 1300; // the hero copy's reveal transition; the phone band is final after it
+const MIN_BAND = 90;           // px: smallest race band on phones
 
 const hero = document.querySelector("[data-hero]");
 if (hero) initHero(hero);
@@ -42,8 +43,9 @@ function initHero(hero) {
     const r = hero.getBoundingClientRect();
     if (narrow) { // the band between the buttons and the HUD
       const actions = hero.querySelector(".hero-actions"), hudEl = hero.querySelector(".hud");
-      const top = actions.getBoundingClientRect().bottom - r.top + 30;
-      const bottom = hudEl.getBoundingClientRect().top - r.top - 24;
+      const bottom = (hudEl ? hudEl.getBoundingClientRect().top - r.top : h) - 24;
+      let top = (actions ? actions.getBoundingClientRect().bottom - r.top : h * 0.6) + 30;
+      top = Math.min(top, bottom - MIN_BAND); // short screens: keep a usable band, even under the buttons
       return { x0: w * 0.04, x1: w * 0.96, y0: top + 4, y1: bottom - 4 };
     }
     // right of the copy: measure the text itself, not its full-width blocks
@@ -58,6 +60,7 @@ function initHero(hero) {
 
   // ── Build the world (deterministic for a given seed and size) ──
   const build = () => {
+    performance.mark("hero:build");
     const rand = mulberry32(SEED);
     box = courseBox();
     trail = createTrail(box, narrow, rand);
@@ -68,6 +71,7 @@ function initHero(hero) {
     best = race.simulate(runRand() * 10); // a first phantom to race
     runNo = 0;
     startRun();
+    performance.measure("hero:build", "hero:build");
   };
   const startRun = () => {
     runNo++;

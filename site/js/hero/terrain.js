@@ -5,7 +5,6 @@ import { COLOR, rgba } from "../util.js";
 
 export const FALL = 1.6;      // total height lost from start to finish
 const BANK = 0.14;            // valley depth (how much the ground rises off the trail)
-const CELL = 6;               // grid spacing (px)
 const LEVELS = 44;            // contour levels drawn
 const NEGLIGIBLE = 6.907755;  // -ln(1e-3): blend weights below 1e-3 are skipped
 
@@ -20,6 +19,8 @@ const SEGMENTS = [
  */
 export function createTerrain({ w, h, narrow, trail, rand }) {
   const S = Math.max(w, h);
+  // Grid spacing: 6 px on typical screens, coarser on very large ones to bound build time.
+  const CELL = Math.max(6, Math.min(14, Math.round(Math.sqrt((w * h) / 26000))));
   const W = trail.width;
 
   // Mounds sit on or beside the line, so riders choose to take them or skirt them.

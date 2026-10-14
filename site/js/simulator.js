@@ -3,7 +3,7 @@
 // (harshness, bottom-outs, packing down, kick-back), and lost speed becomes lost time
 // against the phantom setup. It's a generic model and says nothing about how
 // PhantomFlow measures.
-import { REDUCED_MOTION, COLOR, rgba, fitCanvas } from "./util.js";
+import { REDUCED_MOTION, COLOR, rgba, fitCanvas, formatDelta } from "./util.js";
 
 // A spring-damper fork rides a fixed section of track. Bad setup bleeds bike speed
 // (harshness, bottom-outs, packing down, kick-back), and lost speed becomes lost time.
@@ -187,7 +187,6 @@ function initSimulator(root) {
   };
 
   // ── readouts ──
-  const fmtDelta = (d) => `${d < 0 ? "−" : "+"}${Math.abs(d).toFixed(2)}`;
   const verdict = (m, setup) => {
     const d = m.time - phantom.time;
     if (d < -0.01) return "<strong>You beat your phantom.</strong> That setup is now the line to chase.";
@@ -216,7 +215,7 @@ function initSimulator(root) {
     splitsEl.innerHTML = SECTORS.map((s, i) => {
       const d = m.splits[i] - phantom.splits[i];
       const cls = d <= 0.005 ? "gain" : "loss";
-      return `<li><span>S${i + 1} · ${s.name}</span><b class="${cls}">${fmtDelta(d)}</b></li>`;
+      return `<li><span>S${i + 1} · ${s.name}</span><b class="${cls}">${formatDelta(d, "")}</b></li>`;
     }).join("");
   };
 
@@ -228,7 +227,7 @@ function initSimulator(root) {
     target = m;
 
     const delta = m.time - phantom.time;
-    out("delta").textContent = `${fmtDelta(delta)} s`;
+    out("delta").textContent = formatDelta(delta);
     out("delta").className = delta <= 0.04 ? "gain" : "loss";
     out("speed").textContent = `${m.avgKmh.toFixed(1)} km/h`;
     out("speed").className = m.avgKmh >= phantom.avgKmh - 0.1 ? "gain" : "";

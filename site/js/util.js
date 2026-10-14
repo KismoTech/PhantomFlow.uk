@@ -36,8 +36,11 @@ export const fitCanvas = (canvas, ctx, width, height) => {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 };
 
-/** Signed time for display: "−0.12 s" / "+0.40 s" (true minus sign). */
-export const formatDelta = (s) => `${s < 0 ? "−" : "+"}${Math.abs(s).toFixed(2)} s`;
+/** Signed time for display: "−0.12 s", "+0.40 s", never "−0.00" (true minus sign). */
+export const formatDelta = (s, unit = " s") => {
+  const v = Math.abs(s) < 0.005 ? 0 : s;
+  return `${v < 0 ? "−" : "+"}${Math.abs(v).toFixed(2)}${unit}`;
+};
 
 /** Run `onShow` / `onHide` as an element enters / leaves the viewport. */
 export const whenVisible = (el, onShow, onHide = () => {}, options) => {
