@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PhantomFlow · Race your phantom</title>
+  <meta name="description" content="PhantomFlow is next-generation ride analysis for downhill mountain biking. Compare every run sector by sector: speed, line, braking and suspension. Built for the mud. In development by KismoTech.">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#050607">
+  <meta property="og:title" content="PhantomFlow · Race your phantom">
+  <meta property="og:description" content="Next-generation ride analysis for downhill mountain biking. Race your phantom.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="main.js" defer></script>
+  <script src="interactive.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-header" data-header>
+    <div class="wrap header-row">
+      <a class="brand" href="./" aria-label="PhantomFlow home">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg>
+        <span>Phantom<b>Flow</b></span>
+      </a>
+      <nav aria-label="Primary">
+        <a href="#phantom">Phantom mode</a>
+        <a href="flow.html">Find your flow</a>
+        <a href="#capabilities">Capabilities</a>
+        <a href="#built">Engineering</a>
+        <a href="#access" class="nav-cta">Early access</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- HERO -->
+    <section class="hero" aria-labelledby="hero-title">
+      <canvas class="hero-canvas" data-trace aria-hidden="true"></canvas>
+      <div class="hero-vignette" aria-hidden="true"></div>
+
+      <div class="wrap hero-inner">
+        <p class="kicker reveal"><span class="pulse" aria-hidden="true"></span> Ride analysis · In development</p>
+        <h1 id="hero-title" class="reveal">Race your<br><span class="gradient">phantom.</span></h1>
+        <p class="lede reveal">Walk the line, ride it, and compare every run, sector by sector. See where
+          the time goes, whether you carried the speed, and what the bike was doing. Built for downhill.
+          Unaffected by mud.</p>
+        <p class="hero-actions reveal">
+          <a class="btn btn-primary" href="#access">Request early access <span aria-hidden="true">→</span></a>
+          <a class="btn btn-quiet" href="#phantom">Explore Phantom mode</a>
+        </p>
+      </div>
+
+      <div class="hud" aria-hidden="true">
+        <div class="hud-cell"><span class="hud-label">Travel</span><span class="hud-val" data-hud="travel">—</span></div>
+        <div class="hud-cell"><span class="hud-label">Bike speed</span><span class="hud-val" data-hud="speed">—</span></div>
+        <div class="hud-cell"><span class="hud-label">Δ Phantom</span><span class="hud-val delta" data-hud="delta">—</span></div>
+        <div class="hud-cell hud-legend">
+          <span><i class="sw sw-live"></i>This run</span>
+          <span><i class="sw sw-phantom"></i>Phantom</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SPEC STRIP -->
+    <section class="specs" aria-label="Key figures">
+      <div class="wrap spec-grid">
+        <div class="spec reveal"><span class="spec-num">100<small>+ Hz</small></span><span class="spec-label">Sampling, every channel</span></div>
+        <div class="spec reveal"><span class="spec-num">1</span><span class="spec-label">Timeline: speed, line, cadence and suspension</span></div>
+        <div class="spec reveal"><span class="spec-num">&lt;60<small>s</small></span><span class="spec-label">To fit, no tools</span></div>
+        <div class="spec reveal"><span class="spec-num">100<small>%</small></span><span class="spec-label">Of every run logged on the bike</span></div>
+      </div>
+    </section>
+
+    <!-- PHANTOM MODE -->
+    <section id="phantom" class="section" aria-labelledby="phantom-title">
+      <div class="wrap split">
+        <div class="split-copy">
+          <p class="eyebrow reveal">Phantom mode</p>
+          <h2 id="phantom-title" class="reveal">Every run leaves a phantom.<br>Beat it.</h2>
+          <p class="reveal">Lay this run over your best one, a team-mate's, or a pro line.
+            PhantomFlow shows where you gained time, where you lost it, and why: the line, the
+            braking, the speed you carried, or the bike.</p>
+          <ul class="bullets reveal">
+            <li>Sector-by-sector delta against any phantom</li>
+            <li>Was the inside line faster on run 3 or run 5?</li>
+            <li>Did you carry enough speed to float the roots, or get hung up?</li>
+            <li>Change one thing, ride again, and see what it did</li>
+          </ul>
+        </div>
+
+        <figure class="panel sectors reveal" aria-label="Illustrative sector comparison">
+          <figcaption class="panel-head">
+            <span>Run 4 vs Phantom (Run 2)</span><span class="tag">Illustrative</span>
+          </figcaption>
+          <ol class="sector-list">
+            <li><span>S1 · Top woods</span><span class="bar"><i style="--w:62%"></i></span><b class="gain">−0.18</b></li>
+            <li><span>S2 · Rock garden</span><span class="bar"><i style="--w:78%" class="loss"></i></span><b class="loss">+0.42</b></li>
+            <li><span>S3 · Root section</span><span class="bar"><i style="--w:54%"></i></span><b class="gain">−0.09</b></li>
+            <li><span>S4 · Motorway</span><span class="bar"><i style="--w:70%"></i></span><b class="gain">−0.27</b></li>
+          </ol>
+          <div class="panel-foot">
+            <span>Total</span><b class="gain">−0.12 s</b>
+          </div>
+          <p class="insight"><span class="insight-dot" aria-hidden="true"></span>S2: braked 6 m later than your phantom, but bottomed out twice. Carry the speed, add +1 click of compression.</p>
+        </figure>
+      </div>
+    </section>
+
+    <!-- CAPABILITIES -->
+    <section id="capabilities" class="section section-tint" aria-labelledby="cap-title">
+      <div class="wrap">
+        <p class="eyebrow reveal">Capabilities</p>
+        <h2 id="cap-title" class="reveal">From course walk to podium.</h2>
+        <div class="cards">
+          <article class="card reveal">
+            <span class="card-idx">01</span>
+            <h3>Walk it</h3>
+            <p>Mark the sections you want to work on as you walk the track. They become sectors for every run.</p>
+          </article>
+          <article class="card reveal">
+            <span class="card-idx">02</span>
+            <h3>Ride it</h3>
+            <p>Every practice run is captured: speed, line, braking, pedalling and suspension, more than 100 times a second.</p>
+          </article>
+          <article class="card reveal">
+            <span class="card-idx">03</span>
+            <h3>Compare it</h3>
+            <p>Run X vs run Y, sector by sector. See which line was faster and whether you had the speed to float the roots.</p>
+          </article>
+          <article class="card reveal">
+            <span class="card-idx">04</span>
+            <h3>Dial it in</h3>
+            <p>Set sag, rebound and compression from what the bike actually did on the hill, then go live for spectators on race day.</p>
+          </article>
+        </div>
+
+        <a class="flow-teaser reveal" href="flow.html">
+          <span class="flow-teaser-mark" aria-hidden="true">
+            <svg viewBox="0 0 64 32"><path d="M2 20 C 10 20, 12 6, 20 6 S 30 26, 38 22 S 50 8, 62 10" fill="none" stroke="#8fb7ff" stroke-width="2" stroke-dasharray="1 4" stroke-linecap="round"/><path d="M2 22 C 10 22, 13 9, 21 9 S 31 28, 39 24 S 51 11, 62 13" fill="none" stroke="#ff7a3d" stroke-width="2.5" stroke-linecap="round"/></svg>
+          </span>
+          <span class="flow-teaser-copy">
+            <strong>Find your flow</strong>
+            <span>Try the interactive simulator. Change the setup, watch the speed, and chase the phantom.</span>
+          </span>
+          <span class="flow-teaser-go" aria-hidden="true">→</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- ENGINEERING -->
+    <section id="built" class="section" aria-labelledby="built-title">
+      <div class="wrap two-col">
+        <div>
+          <p class="eyebrow reveal">Engineering</p>
+          <h2 id="built-title" class="reveal">Engineered for the worst day of the season.</h2>
+          <p class="muted reveal">Downhill is hard on electronics: mud, water, rock strikes and constant vibration.
+            PhantomFlow is designed for that from the start.</p>
+        </div>
+        <ul class="ticks">
+          <li class="reveal"><strong>Unaffected by mud</strong><span>Non-contact sensing. No lens to wipe, no slider to clog.</span></li>
+          <li class="reveal"><strong>Fully sealed</strong><span>No exposed moving parts. Designed for rain and the pressure washer.</span></li>
+          <li class="reveal"><strong>Fits in seconds</strong><span>No precise alignment, linkages or tools. Move it between bikes in the pits.</span></li>
+          <li class="reveal"><strong>Built to take hits</strong><span>Solid-state, for flat landings, rock strikes and constant vibration.</span></li>
+          <li class="reveal"><strong>One picture of the run</strong><span>The app combines the device with GPS, accelerometer, cadence and wheel-speed data, all on one timeline.</span></li>
+          <li class="reveal"><strong>Never drops a run</strong><span>Every run is stored on the bike, so the data survives when the signal drops in the woods.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ACCESS -->
+    <section id="access" class="section access" aria-labelledby="access-title">
+      <canvas class="flow-field" data-flowfield aria-hidden="true"></canvas>
+      <div class="wrap access-inner reveal">
+        <p class="eyebrow">Early access</p>
+        <h2 id="access-title">Ride it first.</h2>
+        <p class="muted">PhantomFlow is in prototype. We're looking for riders, teams, mechanics and race
+          organisers to test it early and help shape it.</p>
+        <div class="contact-slot" role="status">
+          <!-- CONTACT: replace this block once the domain and mailbox / form are live. -->
+          <span class="pulse" aria-hidden="true"></span>
+          <span><strong>Registration opens soon.</strong> Contact details are on the way. Check back shortly.</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-row">
+      <a class="brand brand-sm" href="./"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg><span>Phantom<b>Flow</b></span></a>
+      <span>© 2026 KismoTech · In development. Features and figures may change.</span>
+    </div>
+  </footer>
+
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <linearGradient id="mark-g" x1="0" x2="1" y1="0" y2="0">
+        <stop offset="0" stop-color="#ff7a3d"/><stop offset="1" stop-color="#ffb36b"/>
+      </linearGradient>
+    </defs>
+    <symbol id="mark" viewBox="0 0 32 32">
+      <path d="M3 23 C 8 23, 9 11, 14 11 S 19 25, 24 23 S 28 13, 29 13" fill="none" stroke="#8fb7ff" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="0.1 4.6" opacity=".7"/>
+      <path d="M3 20 C 8 20, 9 8, 14 8 S 19 22, 24 20 S 28 10, 29 10" fill="none" stroke="url(#mark-g)" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
+  </svg>
+</body>
+</html>

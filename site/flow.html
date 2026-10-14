@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Find your flow · PhantomFlow</title>
+  <meta name="description" content="Interactive suspension setup simulator from PhantomFlow. Tune compression and rebound damping and chase your phantom.">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#050607">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="main.js" defer></script>
+  <script src="interactive.js" defer></script>
+</head>
+<body class="page-flow">
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-header is-scrolled" data-header>
+    <div class="wrap header-row">
+      <a class="brand" href="./" aria-label="PhantomFlow home">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg>
+        <span>Phantom<b>Flow</b></span>
+      </a>
+      <nav aria-label="Primary">
+        <a href="./#phantom">Phantom mode</a>
+        <a href="flow.html" aria-current="page">Find your flow</a>
+        <a href="./#capabilities">Capabilities</a>
+        <a href="./#built">Engineering</a>
+        <a href="./#access" class="nav-cta">Early access</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="section section-flow flow-page" aria-labelledby="flow-title">
+      <div class="wrap">
+        <div class="flow-head">
+          <a class="back reveal" href="./"><span aria-hidden="true">←</span> PhantomFlow</a>
+          <p class="eyebrow reveal">Setup simulator</p>
+          <h1 id="flow-title" class="reveal">Find your <span class="gradient">flow.</span></h1>
+          <p class="muted reveal">Change the setup and ride the same section again. Watch your speed against
+            the phantom, sector by sector, and see whether you carry enough to float the roots.</p>
+        </div>
+
+        <div class="panel tuner reveal" data-tuner>
+          <div class="tuner-top">
+            <div class="readouts" aria-live="polite">
+              <div><span class="hud-label">Δ Phantom</span><b data-out="delta">—</b></div>
+              <div><span class="hud-label">Avg speed</span><b data-out="speed">—</b></div>
+              <div><span class="hud-label">Through the roots</span><b data-out="roots">—</b></div>
+              <div><span class="hud-label">Bottom-outs</span><b data-out="bottoms">—</b></div>
+            </div>
+            <span class="tag">Illustrative simulation</span>
+          </div>
+
+          <canvas class="tuner-canvas" data-tuner-canvas aria-hidden="true"></canvas>
+          <ol class="splits" data-splits aria-label="Sector times against the phantom"></ol>
+          <p class="tuner-verdict" data-out="verdict" aria-live="polite">&nbsp;</p>
+
+          <div class="controls">
+            <label class="control">
+              <span class="control-row"><span>Compression damping</span><output data-val="comp">6</output></span>
+              <input type="range" min="1" max="20" value="6" data-in="comp" aria-describedby="comp-hint">
+              <span id="comp-hint" class="control-hint"><span>Soft</span><span>Firm</span></span>
+            </label>
+            <label class="control">
+              <span class="control-row"><span>Rebound damping</span><output data-val="reb">16</output></span>
+              <input type="range" min="1" max="20" value="16" data-in="reb" aria-describedby="reb-hint">
+              <span id="reb-hint" class="control-hint"><span>Fast</span><span>Slow</span></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="howto">
+          <div class="howto-item reveal">
+            <span class="sw sw-live" aria-hidden="true"></span>
+            <h2>This run</h2>
+            <p>Fork travel (top) and bike speed (bottom) through one section. Red shading is speed you gave away.</p>
+          </div>
+          <div class="howto-item reveal">
+            <span class="sw sw-phantom" aria-hidden="true"></span>
+            <h2>Your phantom</h2>
+            <p>Your best run so far. Match it and you're riding with it. Beat it and it becomes the line to chase.</p>
+          </div>
+          <div class="howto-item reveal">
+            <span class="sw sw-float" aria-hidden="true"></span>
+            <h2>Float speed</h2>
+            <p>Carry enough speed into the roots and the bike skims over them. Arrive too slow and you get hung up.</p>
+          </div>
+        </div>
+
+        <section class="fusion reveal" aria-labelledby="fusion-title">
+          <h2 id="fusion-title">On the hill, it's your real data.</h2>
+          <p>This page is a simplified model. The PhantomFlow app combines the suspension sensors with GPS,
+            accelerometer, cadence and wheel-speed data, so every run is timed, mapped and split
+            into sectors automatically.</p>
+          <ul class="fusion-list">
+            <li><strong>Walk it</strong><span>Mark the sections you want to compare while you walk the track.</span></li>
+            <li><strong>Ride it</strong><span>Every practice run is captured and lined up against your phantom.</span></li>
+            <li><strong>Compare it</strong><span>Run 3 vs run 5, sector by sector: line, speed, braking and suspension.</span></li>
+            <li><strong>Talk it through</strong><span>Rider, coach and mechanic all look at the same run.</span></li>
+          </ul>
+        </section>
+
+        <p class="flow-cta reveal">
+          <a class="btn btn-primary" href="./#access">Request early access <span aria-hidden="true">→</span></a>
+          <a class="btn btn-quiet" href="./">Back to PhantomFlow</a>
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-row">
+      <a class="brand brand-sm" href="./"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg><span>Phantom<b>Flow</b></span></a>
+      <span>© 2026 KismoTech · In development. Features and figures may change.</span>
+    </div>
+  </footer>
+
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <linearGradient id="mark-g" x1="0" x2="1" y1="0" y2="0">
+        <stop offset="0" stop-color="#ff7a3d"/><stop offset="1" stop-color="#ffb36b"/>
+      </linearGradient>
+    </defs>
+    <symbol id="mark" viewBox="0 0 32 32">
+      <path d="M3 23 C 8 23, 9 11, 14 11 S 19 25, 24 23 S 28 13, 29 13" fill="none" stroke="#8fb7ff" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="0.1 4.6" opacity=".7"/>
+      <path d="M3 20 C 8 20, 9 8, 14 8 S 19 22, 24 20 S 28 10, 29 10" fill="none" stroke="url(#mark-g)" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
+  </svg>
+</body>
+</html>
