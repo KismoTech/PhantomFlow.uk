@@ -7,10 +7,11 @@ GitHub Pages by the Actions workflow.
 site/                    ← everything published (and nothing else)
 ├── index.html           landing page
 ├── flow.html            "Find your flow" interactive setup simulator
-├── styles.css           shared styles (dark theme)
+├── styles.css           shared styles: Contour brand tokens, light sand + .dark forest themes
 ├── main.js              hero telemetry animation, header, scroll reveals
-├── interactive.js       simulator, flow field, phantom cursor
-├── favicon.svg
+├── interactive.js       simulator, flow field
+├── favicon.svg          brand mark (source: design repo docs/brand/assets/mark.svg)
+├── fonts/               self-hosted Archivo + IBM Plex Mono (woff2, SIL OFL; licences included)
 └── 404.html             self-contained (works at any path depth)
 .github/workflows/pages.yml   deploys site/ on push to main
 ```
@@ -43,15 +44,16 @@ The simulator is a generic spring-damper model, so it reveals nothing about how 
 
 ## Design notes
 
-- Dark-only, system fonts, no third-party scripts, fonts or trackers, so no cookie banner is needed.
+- Brand: **Contour** (forest, sand, oxide; Archivo Expanded + IBM Plex Mono). The spec lives in the
+  private design repo (`docs/brand/README.md`). The site copies assets from there.
+- Sections default to sand. Add `.dark` for forest; components re-theme via CSS variables.
+- No third-party scripts, fonts or trackers (fonts are self-hosted), so no cookie banner is needed.
 - All motion respects `prefers-reduced-motion`. Canvases pause when off-screen.
-- The phantom cursor only runs on devices with a fine pointer that can hover.
 
 ## Go-live checklist
 
-- [ ] Set Pages source to **GitHub Actions** (see above).
+- [x] Set Pages source to **GitHub Actions** (see above).
 - [ ] Register `phantomflow.uk` / `phantomflow.co.uk`.
 - [ ] Add `site/CNAME` containing `phantomflow.uk`, set the DNS records, and tick *Enforce HTTPS*.
 - [ ] Replace the contact placeholder in `site/index.html` (search for `CONTACT:`) with a mailbox or form link.
 - [ ] Add `og:image` and `og:url` once the domain is live.
-- [ ] Consider self-hosting a display typeface (e.g. Inter) for a consistent look across platforms.

@@ -82,15 +82,6 @@
   const WINDOW = 7;           // seconds visible
   const yOf = (v, top, band) => top + band * (1 - v);
 
-  const drawGrid = (top, band) => {
-    ctx.strokeStyle = "rgba(255,255,255,0.045)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let i = 0; i <= 4; i++) { const y = Math.round(top + (band * i) / 4) + 0.5; ctx.moveTo(0, y); ctx.lineTo(w, y); }
-    const step = w / 14;
-    for (let x = 0; x <= w; x += step) { const xx = Math.round(x) + 0.5; ctx.moveTo(xx, top); ctx.lineTo(xx, top + band); }
-    ctx.stroke();
-  };
 
   const trace = (fn, t0, top, band, end) => {
     ctx.beginPath();
@@ -115,28 +106,27 @@
     if (w < 900 && layout.gapTop) { top = layout.gapTop; band = Math.max(60, layout.gapBottom - layout.gapTop); }
 
     ctx.clearRect(0, 0, w, h);
-    drawGrid(top, band);
 
     // phantom: full width, dashed, cool
     ctx.save();
     ctx.setLineDash([2, 7]);
     ctx.lineWidth = 2;
-    ctx.strokeStyle = "rgba(143,183,255,0.65)";
-    ctx.shadowColor = "rgba(143,183,255,0.5)"; ctx.shadowBlur = 8;
+    ctx.strokeStyle = "rgba(233,226,210,0.6)";
+    ctx.shadowBlur = 0;
     trace(phantom, t0, top, band, w);
     ctx.stroke();
     ctx.restore();
 
     // live: up to playhead, glowing gradient
     const g = ctx.createLinearGradient(0, 0, head, 0);
-    g.addColorStop(0, "rgba(255,122,61,0)");
-    g.addColorStop(0.35, "rgba(255,122,61,0.55)");
-    g.addColorStop(1, "rgba(255,179,107,1)");
+    g.addColorStop(0, "rgba(226,96,44,0)");
+    g.addColorStop(0.35, "rgba(226,96,44,0.6)");
+    g.addColorStop(1, "rgba(238,122,72,1)");
     ctx.save();
     ctx.lineWidth = 2.6;
     ctx.lineJoin = "round";
     ctx.strokeStyle = g;
-    ctx.shadowColor = "rgba(255,122,61,0.75)"; ctx.shadowBlur = 16;
+    ctx.shadowColor = "rgba(226,96,44,0.45)"; ctx.shadowBlur = 8;
     trace(live, t0, top, band, head);
     ctx.stroke();
     ctx.restore();
@@ -146,7 +136,7 @@
     trace(live, t0, top, band, head);
     ctx.lineTo(head, top + band); ctx.lineTo(0, top + band); ctx.closePath();
     const fill = ctx.createLinearGradient(0, top, 0, top + band);
-    fill.addColorStop(0, "rgba(255,122,61,0.10)"); fill.addColorStop(1, "rgba(255,122,61,0)");
+    fill.addColorStop(0, "rgba(226,96,44,0.12)"); fill.addColorStop(1, "rgba(226,96,44,0)");
     ctx.fillStyle = fill; ctx.fill();
     ctx.restore();
 
@@ -157,8 +147,8 @@
     const lg = ctx.createLinearGradient(0, top - 40, 0, top + band + 40);
     lg.addColorStop(0, "rgba(255,255,255,0)"); lg.addColorStop(0.5, "rgba(255,255,255,0.22)"); lg.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = lg; ctx.fillRect(Math.round(head), top - 40, 1, band + 80);
-    ctx.beginPath(); ctx.arc(head, yHead, 9, 0, Math.PI * 2); ctx.fillStyle = "rgba(255,122,61,0.18)"; ctx.fill();
-    ctx.beginPath(); ctx.arc(head, yHead, 3.6, 0, Math.PI * 2); ctx.fillStyle = "#ffd2b0"; ctx.fill();
+    ctx.beginPath(); ctx.arc(head, yHead, 9, 0, Math.PI * 2); ctx.fillStyle = "rgba(226,96,44,0.22)"; ctx.fill();
+    ctx.beginPath(); ctx.arc(head, yHead, 3.6, 0, Math.PI * 2); ctx.fillStyle = "#F3EEE3"; ctx.fill();
 
     // HUD (throttled)
     if (now - lastHud > 110) {

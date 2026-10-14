@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PhantomFlow · Race your phantom</title>
   <meta name="description" content="PhantomFlow is next-generation ride analysis for downhill mountain biking. Compare every run sector by sector: speed, line, braking and suspension. Built for the mud. In development by KismoTech.">
-  <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#050607">
+  <meta name="theme-color" content="#15241D">
   <meta property="og:title" content="PhantomFlow · Race your phantom">
   <meta property="og:description" content="Next-generation ride analysis for downhill mountain biking. Race your phantom.">
   <meta property="og:type" content="website">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="fonts/archivo-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="styles.css">
   <script src="main.js" defer></script>
   <script src="interactive.js" defer></script>
@@ -21,7 +22,7 @@
   <header class="site-header" data-header>
     <div class="wrap header-row">
       <a class="brand" href="./" aria-label="PhantomFlow home">
-        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg>
+        <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true"><use href="#mark"/></svg>
         <span>Phantom<b>Flow</b></span>
       </a>
       <nav aria-label="Primary">
@@ -36,7 +37,19 @@
 
   <main id="main">
     <!-- HERO -->
-    <section class="hero" aria-labelledby="hero-title">
+    <section class="hero dark" aria-labelledby="hero-title">
+      <svg class="contours" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <path d="M-40 140 C 160 80, 330 220, 520 160 S 900 40, 1240 120"/>
+        <path d="M-40 210 C 170 150, 340 300, 540 230 S 910 110, 1240 190"/>
+        <path d="M-40 280 C 180 225, 350 380, 560 300 S 920 180, 1240 260"/>
+        <path d="M-40 350 C 190 300, 360 460, 580 370 S 930 250, 1240 330"/>
+        <path d="M-40 420 C 200 375, 370 540, 600 440 S 940 320, 1240 400"/>
+        <path d="M-40 490 C 210 450, 380 620, 620 510 S 950 390, 1240 470"/>
+        <path d="M-40 560 C 220 525, 390 700, 640 580 S 960 460, 1240 540"/>
+        <path d="M-40 630 C 230 600, 400 780, 660 650 S 970 530, 1240 610"/>
+        <path d="M720 520 C 760 470, 840 470, 860 520 S 800 600, 760 580 S 690 560, 720 520"/>
+        <path d="M740 525 C 770 495, 820 495, 832 526 S 795 568, 768 560 S 725 548, 740 525"/>
+      </svg>
       <canvas class="hero-canvas" data-trace aria-hidden="true"></canvas>
       <div class="hero-vignette" aria-hidden="true"></div>
 
@@ -138,7 +151,7 @@
 
         <a class="flow-teaser reveal" href="flow.html">
           <span class="flow-teaser-mark" aria-hidden="true">
-            <svg viewBox="0 0 64 32"><path d="M2 20 C 10 20, 12 6, 20 6 S 30 26, 38 22 S 50 8, 62 10" fill="none" stroke="#8fb7ff" stroke-width="2" stroke-dasharray="1 4" stroke-linecap="round"/><path d="M2 22 C 10 22, 13 9, 21 9 S 31 28, 39 24 S 51 11, 62 13" fill="none" stroke="#ff7a3d" stroke-width="2.5" stroke-linecap="round"/></svg>
+            <svg viewBox="0 0 64 32"><path d="M2 20 C 10 20, 12 6, 20 6 S 30 26, 38 22 S 50 8, 62 10" fill="none" stroke="#E9E2D2" stroke-opacity=".7" stroke-width="2" stroke-dasharray="1 4" stroke-linecap="round"/><path d="M2 22 C 10 22, 13 9, 21 9 S 31 28, 39 24 S 51 11, 62 13" fill="none" stroke="#E2602C" stroke-width="2.5" stroke-linecap="round"/></svg>
           </span>
           <span class="flow-teaser-copy">
             <strong>Find your flow</strong>
@@ -150,7 +163,19 @@
     </section>
 
     <!-- ENGINEERING -->
-    <section id="built" class="section" aria-labelledby="built-title">
+    <section id="built" class="section dark" aria-labelledby="built-title">
+      <svg class="contours" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <path d="M-40 140 C 160 80, 330 220, 520 160 S 900 40, 1240 120"/>
+        <path d="M-40 210 C 170 150, 340 300, 540 230 S 910 110, 1240 190"/>
+        <path d="M-40 280 C 180 225, 350 380, 560 300 S 920 180, 1240 260"/>
+        <path d="M-40 350 C 190 300, 360 460, 580 370 S 930 250, 1240 330"/>
+        <path d="M-40 420 C 200 375, 370 540, 600 440 S 940 320, 1240 400"/>
+        <path d="M-40 490 C 210 450, 380 620, 620 510 S 950 390, 1240 470"/>
+        <path d="M-40 560 C 220 525, 390 700, 640 580 S 960 460, 1240 540"/>
+        <path d="M-40 630 C 230 600, 400 780, 660 650 S 970 530, 1240 610"/>
+        <path d="M720 520 C 760 470, 840 470, 860 520 S 800 600, 760 580 S 690 560, 720 520"/>
+        <path d="M740 525 C 770 495, 820 495, 832 526 S 795 568, 768 560 S 725 548, 740 525"/>
+      </svg>
       <div class="wrap two-col">
         <div>
           <p class="eyebrow reveal">Engineering</p>
@@ -170,7 +195,7 @@
     </section>
 
     <!-- ACCESS -->
-    <section id="access" class="section access" aria-labelledby="access-title">
+    <section id="access" class="section access dark" aria-labelledby="access-title">
       <canvas class="flow-field" data-flowfield aria-hidden="true"></canvas>
       <div class="wrap access-inner reveal">
         <p class="eyebrow">Early access</p>
@@ -188,21 +213,20 @@
 
   <footer class="site-footer">
     <div class="wrap footer-row">
-      <a class="brand brand-sm" href="./"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg><span>Phantom<b>Flow</b></span></a>
+      <a class="brand brand-sm" href="./"><svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true"><use href="#mark"/></svg><span>Phantom<b>Flow</b></span></a>
       <span>© 2026 KismoTech · In development. Features and figures may change.</span>
     </div>
   </footer>
 
 
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <defs>
-      <linearGradient id="mark-g" x1="0" x2="1" y1="0" y2="0">
-        <stop offset="0" stop-color="#ff7a3d"/><stop offset="1" stop-color="#ffb36b"/>
-      </linearGradient>
-    </defs>
-    <symbol id="mark" viewBox="0 0 32 32">
-      <path d="M3 23 C 8 23, 9 11, 14 11 S 19 25, 24 23 S 28 13, 29 13" fill="none" stroke="#8fb7ff" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="0.1 4.6" opacity=".7"/>
-      <path d="M3 20 C 8 20, 9 8, 14 8 S 19 22, 24 20 S 28 10, 29 10" fill="none" stroke="url(#mark-g)" stroke-width="3" stroke-linecap="round"/>
+    <symbol id="mark" viewBox="0 0 64 64">
+      <circle cx="32" cy="32" r="32" fill="#15241D"/>
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 50V14h15a13 13 0 0 1 0 26H20" stroke="#E9E2D2" stroke-width="4.5"/>
+        <path d="M26.5 50V20.5H35a6.5 6.5 0 0 1 0 13h-8.5" stroke="#A9C79C" stroke-width="2.2"/>
+      </g>
+      <circle cx="35" cy="27" r="2.6" fill="#E2602C"/>
     </symbol>
   </svg>
 </body>

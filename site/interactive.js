@@ -119,12 +119,12 @@ const fitCanvas = (canvas, ctx, width, height) => {
     arr.forEach((p, i) => (i ? ctx.lineTo(X(i, arr.length), Y(p)) : ctx.moveTo(X(i, arr.length), Y(p))));
   };
   const strokePhantom = () => {
-    ctx.save(); ctx.setLineDash([2, 6]); ctx.lineWidth = 2; ctx.strokeStyle = "rgba(143,183,255,0.8)";
-    ctx.shadowColor = "rgba(143,183,255,0.5)"; ctx.shadowBlur = 8; ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.setLineDash([2, 6]); ctx.lineWidth = 2; ctx.strokeStyle = "rgba(233,226,210,0.75)";
+    ctx.stroke(); ctx.restore();
   };
   const strokeLive = () => {
-    ctx.save(); ctx.lineWidth = 2.4; ctx.lineJoin = "round"; ctx.strokeStyle = "#ff8f52";
-    ctx.shadowColor = "rgba(255,122,61,0.8)"; ctx.shadowBlur = 14; ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.lineWidth = 2.4; ctx.lineJoin = "round"; ctx.strokeStyle = "#E2602C";
+    ctx.shadowColor = "rgba(226,96,44,0.45)"; ctx.shadowBlur = 8; ctx.stroke(); ctx.restore();
   };
   const hline = (y, color) => {
     ctx.strokeStyle = color; ctx.beginPath(); ctx.moveTo(pad.l, Math.round(y) + 0.5); ctx.lineTo(w - pad.r, Math.round(y) + 0.5); ctx.stroke();
@@ -149,18 +149,18 @@ const fitCanvas = (canvas, ctx, width, height) => {
 
     // reference lines
     ctx.lineWidth = 1; ctx.setLineDash([3, 5]);
-    hline(Ytravel(g, 1), "rgba(255,107,107,0.35)");
+    hline(Ytravel(g, 1), "rgba(255,122,112,0.4)");
     hline(Ytravel(g, SAG), "rgba(255,255,255,0.12)");
     hline(Yspeed(g, V0), "rgba(255,255,255,0.10)");
-    ctx.strokeStyle = "rgba(95,224,161,0.55)";
+    ctx.strokeStyle = "rgba(169,199,156,0.7)";
     const rootsSector = SECTORS.findIndex((s) => s.name === "Roots");
     const fx0 = Xt(SECTORS[rootsSector - 1].end), fx1 = Xt(SECTORS[rootsSector].end);
     const fy = Math.round(Yspeed(g, FLOAT_KMH / 3.6)) + 0.5;
     ctx.beginPath(); ctx.moveTo(fx0, fy); ctx.lineTo(fx1, fy); ctx.stroke();
     ctx.setLineDash([]);
-    tag(`FLOAT ${FLOAT_KMH} KM/H`, fx0 + 6, fy - 5, "rgba(95,224,161,0.8)");
+    tag(`FLOAT ${FLOAT_KMH} KM/H`, fx0 + 6, fy - 5, "rgba(169,199,156,0.95)");
     tag("SUSPENSION TRAVEL", pad.l + 6, g.travelTop + 12, "rgba(255,255,255,0.5)");
-    tag("BOTTOM-OUT", w - pad.r - 74, Ytravel(g, 1) - 6, "rgba(255,107,107,0.65)");
+    tag("BOTTOM-OUT", w - pad.r - 74, Ytravel(g, 1) - 6, "rgba(255,122,112,0.75)");
     tag("SAG", w - pad.r - 24, Ytravel(g, SAG) - 6, "rgba(255,255,255,0.32)");
     tag("BIKE SPEED", pad.l + 6, g.speedTop - 8, "rgba(255,255,255,0.5)");
     tag(`${Math.round(V0 * 3.6)} KM/H`, w - pad.r - 50, Yspeed(g, V0) - 5, "rgba(255,255,255,0.32)");
@@ -177,18 +177,18 @@ const fitCanvas = (canvas, ctx, width, height) => {
     ctx.beginPath();
     shown.vs.forEach((s, i) => (i ? ctx.lineTo(Xi(i, shown.vs.length), Yspeed(g, s)) : ctx.moveTo(Xi(i, shown.vs.length), Yspeed(g, s))));
     for (let i = phantom.vs.length - 1; i >= 0; i--) ctx.lineTo(Xi(i, phantom.vs.length), Yspeed(g, phantom.vs[i]));
-    ctx.closePath(); ctx.fillStyle = "rgba(255,107,107,0.10)"; ctx.fill();
+    ctx.closePath(); ctx.fillStyle = "rgba(255,122,112,0.12)"; ctx.fill();
 
     {
       const ok = target.rootsKmh >= FLOAT_KMH;
       const y = Yspeed(g, target.rootsKmh / 3.6), x = Xt(target.rootsAt);
-      ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fillStyle = ok ? "rgba(95,224,161,0.22)" : "rgba(255,107,107,0.22)"; ctx.fill();
-      ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fillStyle = ok ? "#5fe0a1" : "#ff6b6b"; ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fillStyle = ok ? "rgba(169,199,156,0.25)" : "rgba(255,122,112,0.22)"; ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fillStyle = ok ? "#A9C79C" : "#FF7A70"; ctx.fill();
     }
     for (const t of target.marks) {
       const y = Ytravel(g, 1);
-      ctx.beginPath(); ctx.arc(Xt(t), y, 9, 0, Math.PI * 2); ctx.fillStyle = "rgba(255,107,107,0.2)"; ctx.fill();
-      ctx.beginPath(); ctx.arc(Xt(t), y, 3.5, 0, Math.PI * 2); ctx.fillStyle = "#ff6b6b"; ctx.fill();
+      ctx.beginPath(); ctx.arc(Xt(t), y, 9, 0, Math.PI * 2); ctx.fillStyle = "rgba(255,122,112,0.2)"; ctx.fill();
+      ctx.beginPath(); ctx.arc(Xt(t), y, 3.5, 0, Math.PI * 2); ctx.fillStyle = "#FF7A70"; ctx.fill();
     }
     ctx.restore();
   };
@@ -318,7 +318,7 @@ const fitCanvas = (canvas, ctx, width, height) => {
     Math.sin(x * 0.0032 + t * 0.00011) * 1.1 + Math.cos(y * 0.0045 - t * 0.00007) * 0.9 + Math.sin((x + y) * 0.0017) * 0.6;
 
   const frame = (t) => {
-    ctx.fillStyle = "rgba(5,6,7,0.075)";
+    ctx.fillStyle = "rgba(21,36,29,0.075)";
     ctx.fillRect(0, 0, w, h);
     ctx.lineWidth = 1.1;
     for (const p of parts) {
@@ -326,7 +326,7 @@ const fitCanvas = (canvas, ctx, width, height) => {
       let vx = Math.cos(a) * 1.15 + 0.55, vy = Math.sin(a) * 0.9;
       const dx = p.x - pointer.x, dy = p.y - pointer.y, d = Math.hypot(dx, dy);
       if (d < 200) { const f = (1 - d / 200) * 2.4; vx += (-dy / (d + 1)) * f; vy += (dx / (d + 1)) * f; }
-      ctx.strokeStyle = p.blue ? "rgba(143,183,255,0.38)" : "rgba(255,122,61,0.42)";
+      ctx.strokeStyle = p.blue ? "rgba(169,199,156,0.4)" : "rgba(226,96,44,0.45)";
       ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + vx, p.y + vy); ctx.stroke();
       p.x += vx; p.y += vy;
       if (--p.life < 0 || p.x > w + 5 || p.x < -5 || p.y < -5 || p.y > h + 5) spawn(p, Math.random() < 0.6);
