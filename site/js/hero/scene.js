@@ -121,7 +121,7 @@ function initHero(hero) {
     f.fillStyle = rgba(COLOR.forest, 1 - Math.pow(1 - 0.08, k)); // trails fade at a fixed rate per second
     f.fillRect(0, 0, w, h);
     const U = trail.unit;
-    f.lineWidth = 1.45 * U;
+    f.lineWidth = 1.28 * U;
     for (const p of particles) {
       const [gx, gy] = terrain.grad(p.x, p.y);
       const gl = Math.hypot(gx, gy) || 1;
@@ -135,7 +135,7 @@ function initHero(hero) {
         const rd = Math.hypot(p.x - rider.x, p.y - rider.y);
         if (rd < 90 * U) { const k = (1 - rd / (90 * U)) * 2.2 * U; vx += rider.hx * k; vy += rider.hy * k; }
       }
-      f.strokeStyle = p.oxide ? rgba(COLOR.oxide, 0.5) : rgba(COLOR.moss, 0.45);
+      f.strokeStyle = p.oxide ? rgba(COLOR.oxide, 0.46) : rgba(COLOR.moss, 0.42);
       vx *= k; vy *= k;
       f.beginPath(); f.moveTo(p.x, p.y); f.lineTo(p.x + vx, p.y + vy); f.stroke();
       p.x += vx; p.y += vy;
