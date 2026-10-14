@@ -38,6 +38,21 @@ manually from the Actions tab.
 
 One-time setup: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 
+## Content governance
+
+Every factual or product claim on the site is registered in the private design repo's
+**public claims register** (`docs/website/claims.yml`, ADR 0005), which maps it to the design
+documents it rests on. Claim-bearing elements carry `data-claim="C-NNN"`:
+
+```html
+<li class="reveal" data-claim="C-008"><strong>Unaffected by mud</strong>…</li>
+```
+
+- **New or changed claim?** Add or update its register entry (design repo) and tag the element.
+- **Removing a claim?** Remove the tag and retire or update the register entry.
+- The design repo's *Website sync* workflow cross-checks these tags weekly and whenever design
+  docs change, and opens a `site-sync` issue when a claim's sources change.
+
 ## Content rules
 
 This repo is **public**. Content describes **benefits only**. Do not mention:
