@@ -94,8 +94,8 @@ function initHero(hero) {
     w = r.width; h = r.height; narrow = w < NARROW;
     for (const k in layers) fitCanvas(layers[k], ctx[k], w, h);
     build();
-    const U = trail.unit; // same density at any size: fewer, faster, bigger particles on big screens
-    particles = Array.from({ length: Math.min(1300, Math.round((w * h) / (1000 * U * U))) }, () => spawn());
+    // fixed-size streaks, so keep the same density per pixel (more of them on big screens)
+    particles = Array.from({ length: Math.min(2200, Math.round((w * h) / 1000)) }, () => spawn());
     ctx.flow.fillStyle = COLOR.forest;
     ctx.flow.fillRect(0, 0, w, h);
   };
@@ -121,7 +121,7 @@ function initHero(hero) {
     f.fillStyle = rgba(COLOR.forest, 1 - Math.pow(1 - 0.08, k)); // trails fade at a fixed rate per second
     f.fillRect(0, 0, w, h);
     const U = trail.unit;
-    f.lineWidth = 1.28 * U;
+    f.lineWidth = 1.28; // fine texture: a fixed pixel size at any screen size (motion still scales)
     for (const p of particles) {
       const [gx, gy] = terrain.grad(p.x, p.y);
       const gl = Math.hypot(gx, gy) || 1;
