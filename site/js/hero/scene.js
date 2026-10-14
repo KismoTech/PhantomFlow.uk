@@ -118,7 +118,7 @@ function initHero(hero) {
     const f = ctx.flow;
     f.fillStyle = rgba(COLOR.forest, 0.08); f.fillRect(0, 0, w, h);
     const U = trail.unit;
-    f.lineWidth = 1.1 * U;
+    f.lineWidth = 1.45 * U;
     for (const p of particles) {
       const [gx, gy] = terrain.grad(p.x, p.y);
       const gl = Math.hypot(gx, gy) || 1;
@@ -132,7 +132,7 @@ function initHero(hero) {
         const rd = Math.hypot(p.x - rider.x, p.y - rider.y);
         if (rd < 90 * U) { const k = (1 - rd / (90 * U)) * 2.2 * U; vx += rider.hx * k; vy += rider.hy * k; }
       }
-      f.strokeStyle = p.oxide ? rgba(COLOR.oxide, 0.42) : rgba(COLOR.moss, 0.38);
+      f.strokeStyle = p.oxide ? rgba(COLOR.oxide, 0.5) : rgba(COLOR.moss, 0.45);
       f.beginPath(); f.moveTo(p.x, p.y); f.lineTo(p.x + vx, p.y + vy); f.stroke();
       p.x += vx; p.y += vy;
       if (--p.life < 0 || p.x < -5 || p.x > w + 5 || p.y < -5 || p.y > h + 5) spawn(p);
