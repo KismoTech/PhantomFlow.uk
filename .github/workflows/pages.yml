@@ -26,6 +26,10 @@ jobs:
 
       - uses: actions/configure-pages@v5
 
+      # Development previews stay out of the published site until the ride page ships
+      - name: Exclude development previews
+        run: rm -rf site/dev site/js/flow
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
