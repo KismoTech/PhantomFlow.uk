@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Ride PG1 · development preview</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #f4efe6; --fg: #14211b; --muted: #5b6a62; --line: #c9c0ae; --accent: #c2410c; --panel: #fffaf0; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #111c17; --fg: #e8efe9; --muted: #96a89d; --line: #2c3d34; --accent: #f97316; --panel: #172620; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 system-ui, sans-serif; }
+    main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 1.15rem; margin: 0 0 4px; }
+    p.note { color: var(--muted); margin: 0 0 12px; }
+    canvas { width: 100%; height: 46vh; min-height: 240px; max-height: 460px; display: block; border: 1px solid var(--line); border-radius: 6px; touch-action: none; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 12px; }
+    fieldset, .panel { border: 1px solid var(--line); border-radius: 6px; background: var(--panel); padding: 10px 12px; margin: 0; min-width: 0; }
+    legend { font-weight: 600; padding: 0 4px; }
+    label { display: block; margin: 6px 0; }
+    label span { color: var(--muted); font-variant-numeric: tabular-nums; float: right; }
+    input[type=range] { width: 100%; }
+    select, button { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+    button { cursor: pointer; }
+    button:hover { border-color: var(--accent); }
+    .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 0; font-variant-numeric: tabular-nums; }
+    dt { color: var(--muted); }
+    dd { margin: 0; font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+    #log { height: 190px; overflow: auto; font: 12px/1.4 ui-monospace, monospace; white-space: pre-wrap; margin: 0; }
+    .ok { color: #15803d; }
+    .bad { color: #b91c1c; }
+    @media (prefers-color-scheme: dark) { .ok { color: #4ade80; } .bad { color: #f87171; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Ride, slice PG1 · development preview</h1>
+  <p class="note">The PhantomFlow engine's bike in a worker, drawn side-on. A development page: not linked, and the engine build is not published.
+    Keys: <b>D</b> or → drive, <b>F</b> front brake, <b>R</b> or ↓ rear brake. Build and run steps: <code>site/dev/README.md</code>.</p>
+  <canvas id="view" aria-label="Side-on view of the simulated bike"></canvas>
+  <div class="buttons">
+    <button id="restart">Restart</button>
+    <button id="pause">Pause</button>
+    <button id="rewind">Rewind 3 s</button>
+    <button id="verify">Verify replay</button>
+    <button id="reference">Run reference ride (native digest check)</button>
+  </div>
+  <div class="grid">
+    <fieldset id="setup">
+      <legend>Setup (changes restart the ride)</legend>
+      <label>Profile
+        <select id="profile"><option value="auto">auto (by measured cost)</option><option value="interactive">interactive</option><option value="ambient">ambient</option></select></label>
+      <label>Frame
+        <select id="suspension"><option value="0">full suspension</option><option value="1">hardtail</option></select></label>
+      <label>Tyre
+        <select id="tyre"><option value="0">soft</option><option value="1" selected>standard</option><option value="2">firm</option></select></label>
+      <label>Fork spring <span id="forkRateOut"></span><input id="forkRate" type="range" min="4000" max="18000" step="500" value="9000"></label>
+      <label>Shock spring <span id="shockRateOut"></span><input id="shockRate" type="range" min="30000" max="150000" step="2500" value="70000"></label>
+      <label>Damping (compression and rebound together) <span id="dampingOut"></span><input id="damping" type="range" min="0.4" max="2" step="0.05" value="1"></label>
+    </fieldset>
+    <div class="panel">
+      <dl>
+        <dt>profile</dt><dd id="o-profile">-</dd>
+        <dt>simulated</dt><dd id="o-time">-</dd>
+        <dt>tick</dt><dd id="o-tick">-</dd>
+        <dt>digest</dt><dd id="o-digest">-</dd>
+        <dt>cost (steps)</dt><dd id="o-cost">-</dd>
+        <dt>cost (worker busy)</dt><dd id="o-busy">-</dd>
+        <dt>speed ratio</dt><dd id="o-ratio">-</dd>
+        <dt>terrain rebuilds</dt><dd id="o-terrain">-</dd>
+        <dt>guard</dt><dd id="o-guard">-</dd>
+      </dl>
+      <p class="note" id="note">Cost is wall-clock CPU per simulated second in the worker, rolling over 2 s. It measures this device now; it is not a verdict.</p>
+    </div>
+    <div class="panel"><pre id="log" aria-live="polite"></pre></div>
+    <div class="panel"><b>Reference ride</b>
+      <dl id="ref"><dt>interactive</dt><dd>-</dd><dt>ambient</dt><dd>-</dd></dl></div>
+  </div>
+</main>
+<script type="module" src="../js/flow/pg1.js"></script>
+</body>
+</html>
