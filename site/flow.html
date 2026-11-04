@@ -39,8 +39,8 @@
           <a class="back reveal" href="./"><span aria-hidden="true">←</span> PhantomFlow</a>
           <p class="eyebrow reveal">Ride simulator</p>
           <h1 id="flow-title" class="reveal">Find your <span class="gradient">flow.</span></h1>
-          <p class="muted reveal">A real physics model of a generic trail bike rides the same section every time. Change
-            the setup and ride it again, then watch your time against the phantom, sector by sector.</p>
+          <p class="muted reveal">A real physics model of a generic trail bike rides the same section every time, jump
+            included. Change the setup and ride it again, then watch your time against the phantom, sector by sector.</p>
         </div>
 
         <div class="panel tuner ride reveal" id="tuner" data-ride data-claim="C-019">
@@ -51,7 +51,10 @@
               <div><span class="hud-label">Travel used</span><b data-out="travel">—</b></div>
               <div><span class="hud-label">Bottom-outs</span><b data-out="bottoms">—</b></div>
             </div>
-            <span class="tag">Physics model · generic bike</span>
+            <span class="ride-tags">
+              <span class="tag">Physics model · generic bike</span>
+              <span class="tag tag-rider" data-out="rider" data-claim="C-022">Auto rider: on</span>
+            </span>
           </div>
 
           <div class="ride-stage">
@@ -69,7 +72,7 @@
           <div class="ride-actions" role="group" aria-label="Rider controls">
             <button class="btn btn-quiet hold" type="button" data-hold="drive">Pedal <kbd>D</kbd></button>
             <button class="btn btn-quiet hold" type="button" data-hold="rearBrake">Brake <kbd>R</kbd></button>
-            <span class="control-hint ride-hint">Hold to ride it with input · front brake <kbd>F</kbd></span>
+            <span class="control-hint ride-hint">Hold to add your input · front brake <kbd>F</kbd></span>
           </div>
 
           <div class="controls">
@@ -93,6 +96,9 @@
           </div>
 
           <p class="ride-note" data-out="status"></p>
+          <p class="ride-note" data-claim="C-022">Auto rider: on. A simple scripted rider takes the jump for you: it soaks up the lip and
+            levels the bike in the air with the pedals and the rear brake. It acts only through the bike, within force and power
+            limits, and its actions are part of your recorded run. It is an assist, not a full rider model yet.</p>
           <p class="ride-note" data-claim="C-021">The ride runs in your browser and sends nothing. Your best run is kept on this device only.</p>
           <p class="ride-note ride-fallback" data-fallback hidden></p>
           <noscript><p class="ride-note">The ride needs JavaScript, WebAssembly and web workers.</p></noscript>
@@ -102,7 +108,7 @@
           <div class="howto-item reveal" data-claim="C-019">
             <span class="sw sw-live" aria-hidden="true"></span>
             <h2>This run</h2>
-            <p>A solid bike on a fixed trail section: a roll-in, a run of rollers and a rough, bumpy finish. Hold Pedal or Brake if you want to ride it with input.</p>
+            <p>A solid bike on a fixed trail section: a roll-in, a run of rollers, a rough patch, a step-up and a jump to the finish. Hold Pedal or Brake if you want to add your own input.</p>
           </div>
           <div class="howto-item reveal" data-claim="C-020">
             <span class="sw sw-phantom" aria-hidden="true"></span>
@@ -112,7 +118,7 @@
           <div class="howto-item reveal" data-claim="C-019">
             <span class="sw sw-float" aria-hidden="true"></span>
             <h2>What it shows</h2>
-            <p>Setup changes the time, the travel you use and the end stops you hit. Setups are illustrative: one generic bike, no rider yet, and rigid ground.</p>
+            <p>Setup changes the time, the travel you use and the end stops you hit. Setups are illustrative: one generic bike, a simple scripted rider, and rigid ground. Some setups don't make it to the finish; the page says why.</p>
           </div>
         </div>
 

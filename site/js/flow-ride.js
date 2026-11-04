@@ -3,11 +3,14 @@
 // phantom: the best finished run so far, replayed exactly from its recorded inputs in a second bike.
 //
 // - No build step. The page needs WebAssembly, module workers and canvas; without them it says so and does nothing else.
-// - The profile is Ambient. The section is the engine's proving loop's first part (roll-in, rollers, rough), and the engine's
-//   Interactive profile does not yet finish that course (a known numerics item upstream), so the page does not pick it. The
-//   worker still measures its own cost; if this device cannot keep up, the page says so (times stay exact either way).
+// - The profile is Ambient. The section is the engine's proving loop's first part (roll-in, rollers, rough, step-up and jump),
+//   and the engine's Interactive profile does not yet finish that course (a known numerics item upstream), so the page does not
+//   pick it. The worker still measures its own cost; if this device cannot keep up, the page says so (times stay exact either way).
+// - The auto rider is on: a simple scripted rider (js/flow/engine/rider_mvp.js) that soaks up the jump's lip and levels the
+//   bike in the air with the pedals and the rear brake. It acts only through the bike, within force and power limits, and its
+//   actions are part of the recorded inputs, so the phantom replays them exactly. The page draws a marker for it.
 // - Nothing leaves the browser. The best run is kept in this browser's local storage only (js/flow/engine/session.js).
-import { RideView } from "./flow/engine/view.js";
+import { RideView, simpleRider } from "./flow/engine/view.js";
 import { OBS, STOP_KIND_NAMES } from "./flow/engine/engine.js";
 import { BestRun } from "./flow/engine/session.js";
 import { formatDelta } from "./util.js";
@@ -16,7 +19,8 @@ const ENGINE_DIR = new URL("./flow/engine/", import.meta.url);
 const BASE = { forkRate: 9000, shockRate: 70000 };           // the engine's default springs [N/m]; the firmness slider scales both
 const TORQUE = { drive: 40, frontBrake: 60, rearBrake: 80 };   // N m while a control is held
 const KEYS = { d: "drive", r: "rearBrake", f: "frontBrake" };
-const SECTOR_NAMES = { "lead-in": "Roll-in", rollers: "Rollers", rough: "Rough" };
+const SECTOR_NAMES = { "lead-in": "Roll-in", rollers: "Rollers", rough: "Rough", "step-up": "Step-up", jump: "Jump" };
+const RIDER_PHASES = { idle: "riding", ready: "setting up for the jump", absorb: "soaking up the lip", air: "levelling in the air" };
 const CLOSE = 0.04;                                           // s: within this of the phantom counts as locked on
 
 // What a stop gate means in a rider's words. The engine names the gate; the sentence is the page's.
@@ -86,7 +90,7 @@ function init(root) {
     const k = Number(inputs.firm.value);
     return {
       profileMode: "ambient", course: "section", suspension: frameValue(), tyre: 1, forkRate: BASE.forkRate * k, shockRate: BASE.shockRate * k,
-      damping: Number(inputs.damp.value), speed: 3, governor: false, phantom: best.get(),
+      damping: Number(inputs.damp.value), speed: 3, governor: false, autoRider: true, phantom: best.get(),
     };
   };
 
@@ -160,6 +164,8 @@ function init(root) {
     state.status.phantom = state.phantom ? "Phantom replaying…" : "";
     view.reset(m.info);
     view.setTerrain(m.window);
+    view.riderLayer = m.autoRider ? simpleRider : null;
+    out("rider").textContent = m.autoRider ? "Auto rider: on" : "Auto rider: off";
     view.markers = [{ x: m.section.start, label: "start" }, ...m.section.sectors.map((s, i) => ({ x: s.end, label: i === m.section.sectors.length - 1 ? "finish" : SECTOR_NAMES[s.name] ?? s.name }))];
     out("delta").textContent = "—"; out("delta").className = "";
     out("speed").textContent = "—"; out("travel").textContent = "—"; out("bottoms").textContent = "—"; out("bottoms").className = "";
@@ -191,6 +197,7 @@ function init(root) {
   function renderReadouts(m) {
     const sec = m.section;
     out("speed").textContent = `${(m.obs[OBS.speed] * 3.6).toFixed(1)} km/h`;
+    if (m.rider) out("rider").title = `Auto rider: ${RIDER_PHASES[m.rider] ?? m.rider}`;
     if (!sec) return;
     const travel = Math.max(sec.forkMax, sec.shockMax);
     out("travel").textContent = sec.started ? `${Math.round(travel * 100)}%` : "—";
