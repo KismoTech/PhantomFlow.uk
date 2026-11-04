@@ -1,10 +1,10 @@
 {
   "schema": 1,
   "engine": {
-    "release": 1,
-    "version": "1+8c6f59211383"
+    "release": 2,
+    "version": "2+c36cf16b18c2"
   },
-  "flowApiLayout": 3,
+  "flowApiLayout": 4,
   "reference": {
     "interactive": "37aa99e9c78f15eb",
     "ambient": "6e09e4113d4731d5",
@@ -14,7 +14,7 @@
   "build": {
     "date": "2026-11-04"
   },
-  "bundleSha256": "5fd1ec350270a9ff49c7294ccb198a31aa1fc2df7c36e4ec3e3d4b467ae68865",
+  "bundleSha256": "9ba901795c8afa69b570b2ef31e68d08d1b5c660b36d33006a4b6d4ba075ce35",
   "licence": {
     "notice": "Compiled build of KismoTech's proprietary physics engine and its client modules. Copyright (c) 2026 KismoTech. All rights reserved: published only so that this website runs in the browser; see LICENSE.txt.",
     "file": "LICENSE.txt"
@@ -27,8 +27,8 @@
     },
     {
       "path": "engine.js",
-      "bytes": 14736,
-      "sha256": "7fde97d660b4f9ca2f952c81875e59ec1197c8ebe8c256d602245e562db4a76f"
+      "bytes": 15671,
+      "sha256": "c00576b8a7c45cc8c9df17dc719f107b7612526efbbe52b9c93ad3cc026f5dfb"
     },
     {
       "path": "phantomflow_engine.mjs",
@@ -37,13 +37,18 @@
     },
     {
       "path": "phantomflow_engine.wasm",
-      "bytes": 442347,
-      "sha256": "8c6f59211383c9b70bbc807ecd807bc5bfbb9d85d4a3b2921e52a35f1ad38352"
+      "bytes": 444680,
+      "sha256": "c36cf16b18c275fddbdc6e1f6615f6ca9ea13b2658ea6ad374fbcd6769c4868d"
     },
     {
       "path": "reference.js",
       "bytes": 3065,
       "sha256": "07f12d1f0c9f18ca6f70e04b8cc0647c9c50db9bdda567f006994612ede9c04a"
+    },
+    {
+      "path": "rider_mvp.js",
+      "bytes": 6526,
+      "sha256": "a617cdbe66f7bc1d61993358e3b86ab1e42aa38cf38076d5b84be708fc71496f"
     },
     {
       "path": "session.js",
@@ -57,13 +62,13 @@
     },
     {
       "path": "view.js",
-      "bytes": 29312,
-      "sha256": "d7d0db5c988ad043f5c42c545a85cd7dfbc6f1fda8a2543d8ae4e617bd747962"
+      "bytes": 31082,
+      "sha256": "c87e5e2f15cd2bd672f0bf363527e85d32667454f5f24fe204410c4056747e42"
     },
     {
       "path": "worker.js",
-      "bytes": 28546,
-      "sha256": "e5a7d6af9f6aaf5554bcd94f64276ecfa7624a72e231209964b2caf6f56f4a61"
+      "bytes": 30259,
+      "sha256": "6b4bdd76e5cb73906994f6f85fa42257aab5c4e47fcf4ec82e492bf0bce9257a"
     }
   ]
 }

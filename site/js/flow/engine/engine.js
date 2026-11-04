@@ -7,11 +7,11 @@
 
 // The layout version: must equal FLOW_API_VERSION in the module's flow_api.h. It changes whenever the observation or the
 // static information gains, loses or moves an entry, so a page never reads a module it does not match.
-export const API_VERSION = 3;
+export const API_VERSION = 4;
 
 // Layout of the engine's records (mirrors flow_api.h; checked against the module at load).
 export const SETUP_BYTES = 88;
-export const INPUT_DOUBLES = 11; // drive, front brake, rear brake, then 8 reserved rider slots (must stay zero for now)
+export const INPUT_DOUBLES = 11; // drive, front brake, rear brake, then 8 rider slots (RIDER: the first two in use, the rest zero)
 export const INPUT_BYTES = INPUT_DOUBLES * 8;
 export const OBS = Object.freeze({
   time: 0, tick: 1, guard: 2, asleep: 3, frameX: 4, frameZ: 5, pitch: 6, riderX: 7, riderZ: 8,
@@ -19,8 +19,14 @@ export const OBS = Object.freeze({
   forkTravel: 15, rearTravel: 16, riderOffset: 17, speed: 18, verticalSpeed: 19,
   frontLoad: 20, rearLoad: 21, frontDrag: 22, rearDrag: 23, frontContacts: 24, rearContacts: 25,
   terrainFirstX: 26, terrainLastX: 27, swingAngle: 28,
-  frontContactX: 29, frontContactZ: 30, rearContactX: 31, rearContactZ: 32, gates: 33, count: 34,
+  frontContactX: 29, frontContactZ: 30, rearContactX: 31, rearContactZ: 32, gates: 33,
+  pitchRate: 34, riderForce: 35, riderWork: 36, driveWork: 37, angularMomentum: 38, gravityMoment: 39, frontSpin: 40, rearSpin: 41,
+  count: 42,
 });
+// The rider slots in use (the engine's flow_rider_slot): the guided rider's target along the frame's z axis [m] and the force
+// limit of its bounded internal actuator [N] (zero: passive). The engine turns them into a force between rider and frame each
+// step (a servo bounded in force and power); nothing else moves the bike. The other six slots are reserved and zero.
+export const RIDER = Object.freeze({ target: 0, force: 1, slots: 8, reach: 0.12, maxForce: 2000, power: 1500 });
 export const INFO = Object.freeze({
   step: 0, nodes: 1, wheelRadius: 2, rimRadius: 3, forkTravel: 4, shockTravel: 5, riderTravel: 6, mass: 7,
   headAxisX: 8, headAxisZ: 9, budget: 10, full: 11,
@@ -203,26 +209,29 @@ export class FlowBike {
   /**
    * Advances n fixed steps with one input held for all of them.
    * @param {number} n Steps.
-   * @param {{drive?:number, frontBrake?:number, rearBrake?:number}} input Drive and brake torques [N m].
+   * @param {{drive?:number, frontBrake?:number, rearBrake?:number, riderTarget?:number, riderForce?:number}} input Drive and
+   *   brake torques [N m]; the rider's guide target [m] and force limit [N] (RIDER; zero force leaves the rider passive).
    * @returns {number} A STATUS value.
    */
   step(n, input = {}) {
     const view = this._inputs(1);
     view.fill(0);
     view[0] = input.drive ?? 0; view[1] = input.frontBrake ?? 0; view[2] = input.rearBrake ?? 0;
+    view[3 + RIDER.target] = input.riderTarget ?? 0; view[3 + RIDER.force] = input.riderForce ?? 0;
     return this.m._flow_step(this.handle, n, this.inputPtr, 1);
   }
 
   /**
    * Advances n steps with a record per tick.
    * @param {number} n Steps.
-   * @param {(k:number, out:Float64Array)=>void} fill Writes tick k's drive, front brake and rear brake into out[0..2].
+   * @param {(k:number, out:Float64Array)=>void} fill Writes tick k's drive, front brake and rear brake into out[0..2], and the
+   *   rider's target and force limit into out[3..4].
    * @returns {number} A STATUS value.
    */
   stepEach(n, fill) {
     const view = this._inputs(n);
     view.fill(0);
-    for (let k = 0; k < n; k++) fill(k, view.subarray(k * INPUT_DOUBLES, k * INPUT_DOUBLES + 3));
+    for (let k = 0; k < n; k++) fill(k, view.subarray(k * INPUT_DOUBLES, k * INPUT_DOUBLES + 5));
     return this.m._flow_step(this.handle, n, this.inputPtr, n);
   }
 

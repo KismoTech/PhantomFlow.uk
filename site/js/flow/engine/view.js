@@ -5,7 +5,8 @@
 // and its moving coordinates (flow_observe: pose, fork travel, swingarm angle, wheel rotation, tyre nodes). Nothing here
 // moves on its own and nothing is guessed: the fork slides by the reported travel, the swingarm turns about the real
 // pivot, the shock runs between its real eyes. The frame tubes are an outline the engine derives from those points.
-// There is no rider yet: `riderLayer` is the place for one (see draw()). A frame may carry a `ghost` (a second bike's observation,
+// The rider is a hook: `riderLayer` (see draw()); `simpleRider` below is a plain one, a marker for the model's rider (a body on a
+// slide), not a figure that moves on its own. A frame may carry a `ghost` (a second bike's observation,
 // the phantom's), drawn as a translucent silhouette behind the bike; `markers` ([{x, label}]) draw lines on the ground.
 import { OBS, INFO } from "./engine.js";
 
@@ -631,4 +632,38 @@ function geometryFrom(info) {
     seatJoint: pair(INFO.seatJointX, INFO.seatJointZ),
     seatTop: pair(INFO.seatTopX, INFO.seatTopZ),
   };
+}
+
+/**
+ * A simple rider for `riderLayer`: the model's rider is one body on a slide along the frame's vertical axis, so this draws a
+ * marker for it, not a figure with joints of its own. The hip is the body's centre (obs riderX, riderZ, so it rides up and down
+ * the slide exactly as the engine moves it); the legs run to the bottom bracket, the arms to the bars, the head above.
+ * @param {RideView} view
+ * @param {Float64Array} obs
+ */
+export function simpleRider(view, obs) {
+  const g = view.g;
+  if (!g) return;
+  const t = view.tx;
+  // World to frame-local: the inverse of loc's turn.
+  const dx = obs[OBS.riderX] - t.ox, dz = obs[OBS.riderZ] - t.oz;
+  const hx = dx * t.c - dz * t.s, hz = dx * t.s + dz * t.c;
+  const [bx, bz] = g.bb;
+  const barX = g.headTop[0] - 0.03, barZ = g.headTop[1] + 0.1;
+  const shX = hx + 0.55 * (barX - hx), shZ = hz + 0.42;
+  // The knee bends forward of the hip-to-pedal line, by what the leg's length leaves over.
+  const legX = bx - hx, legZ = bz - hz, leg = Math.hypot(legX, legZ);
+  const bend = Math.sqrt(Math.max(0, 0.9 * 0.9 - leg * leg)) / 2;
+  const kx = hx + legX / 2 + bend * (-legZ / leg), kz = hz + legZ / 2 + bend * (legX / leg);
+  const elX = (shX + barX) / 2 - 0.02, elZ = (shZ + barZ) / 2 - 0.06;
+  const color = view.colors.fg;
+  view.ctx.globalAlpha = 0.85;
+  view.seg(hx, hz, kx, kz, 0.07, color);
+  view.seg(kx, kz, bx, bz, 0.055, color);
+  view.seg(hx, hz, shX, shZ, 0.09, color);
+  view.seg(shX, shZ, elX, elZ, 0.045, color);
+  view.seg(elX, elZ, barX, barZ, 0.04, color);
+  view.loc(shX + 0.07, shZ + 0.17);
+  view.circle(view.px, view.py, 0.1 * t.scale, color, null, 0);
+  view.ctx.globalAlpha = 1;
 }

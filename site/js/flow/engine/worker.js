@@ -14,13 +14,17 @@
 // - Run integrity: a stop gate (a crash, a break, or numerics that cannot continue) ends the ride at the last accepted state;
 //   a quality gate (the model outside where it is qualified, such as ground overlap past its limit) is recorded in the run
 //   report, published with every frame, and the ride goes on.
-// - A third course, the flow section: the first part of the proving loop (roll-in, rollers and rough, launched at SECTION_SPEED),
+// - A third course, the flow section: the proving loop through its jump (roll-in, rollers, rough, step-up and jump, launched at SECTION_SPEED),
 //   timed from its start line to its finish with a split per sector, and bottom-outs counted. A finished section is posted as a
 //   result (setup, event log, marks, splits, digest); handed back in the next start's config as `phantom`, it is replayed exactly
 //   in a second bike, in step with the live ride, and drawn as a ghost; its digest is checked against the recorded one.
 // - An optional speed governor (off by default) holds the ride at SPEED_LIMIT: above it the drive is cut and the brakes are
 //   held. The event log records the input applied, governor included.
+// - An optional auto rider (config.autoRider; rider_mvp.js) on the proving-loop courses: a scripted assist that works the
+//   engine's rider slide and the rear hub at each jump. It decides once per batch from the last observation and the trail, so
+//   its output is an input like the keys' and goes into the event log; a replay of the log needs no rider.
 import { loadEngine, defaultSetup, PROFILE, STATUS, OBS, INFO, GATE, STOP_KIND_NAMES } from "./engine.js";
+import { RiderMvp, findLips, combine } from "./rider_mvp.js";
 
 const SEED = 20260;          // the ride's trail seed (any 32-bit value)
 const LOOKAHEAD = 40;        // metres of terrain kept ahead of the front wheel
@@ -38,7 +42,7 @@ const GOVERNOR = { frontBrake: 20, rearBrake: 40 }; // brake torques [N m] held 
 const LOOP_SEED = 2026;      // the proving loop's seed (the engine's native proving-loop tests use the same)
 const LOOP_SPEED = 10.0;     // m/s: the proving loop's launch speed (it is sized for 8 to 12 m/s)
 const SECTION_SPEED = 7.0;   // m/s: the flow section's launch speed (slower, so that ordinary setups ride it through)
-const SECTION_FEATURES = ["lead-in", "rollers", "rough"]; // the loop's features the flow section is made of, in order
+const SECTION_FEATURES = ["lead-in", "rollers", "rough", "step-up", "jump"]; // the loop's features the flow section is made of, in order
 const BOTTOM_BIT = 1 << GATE.bottomOut; // the observation's bit for the bottom-out quality gate
 
 let engine = null;
@@ -46,6 +50,7 @@ let config = null;
 let ride = null;             // the running ride, or null
 let paused = false;
 let input = { drive: 0, frontBrake: 0, rearBrake: 0 };
+const NO_INPUT = Object.freeze({ drive: 0, frontBrake: 0, rearBrake: 0, riderTarget: 0, riderForce: 0 });
 let last = performance.now();
 let timer = 0;
 
@@ -148,8 +153,8 @@ function startRide(cfg, forcedProfile = null, reason = "") {
     bike, profile, cfg, dt: bike.dt, accum: 0, ended: false, rideSeconds: 0, strikes: 0, nextCheck: 1.0,
     trail: { x: bike.setup.startX + 5, z: bike.setup.startZ, next: 0 }, window: { x: [], z: [] }, events: [], snapshots: [], costs: [], busyTotal: 0, simTotal: 0,
     wallStart: performance.now(), lastSnapshotTick: -1, terrainMs: 0, terrainBuilds: 0, lastDigest: "",
-    applied: { drive: 0, frontBrake: 0, rearBrake: 0 }, speed: 0, governorLogged: false, loop: null, completed: false,
-    course: null, tracker: null, phantom: null, result: null, finish: 0,
+    applied: { ...NO_INPUT }, speed: 0, governorLogged: false, loop: null, completed: false,
+    course: null, tracker: null, phantom: null, result: null, finish: 0, rider: null, lastObs: null,
   };
   input = { drive: 0, frontBrake: 0, rearBrake: 0 };
   // The engine's terrain starts as a flat run from start_x - 3 to start_x + 5 at start_z (flow_create): the page's mirror of
@@ -164,9 +169,16 @@ function startRide(cfg, forcedProfile = null, reason = "") {
   } else {
     ride.finish = ride.loop?.finish ?? 0;
   }
+  if (cfg.autoRider && ride.loop) {
+    const jumps = ride.loop.features.filter((f) => f.name === "jump" && f.start < (ride.finish || Infinity));
+    ride.rider = new RiderMvp(findLips(ride.loop.points, jumps));
+    log(`auto rider on: absorb and level at ${ride.rider.lips.length} jump lip(s) (x ${ride.rider.lips.map((x) => x.toFixed(2)).join(", ")} m)`);
+  }
+  ride.lastObs = bike.observe();
   post({
     type: "started", profile, reason, info: bike.info, dt: bike.dt, setup: bike.setup, nodes: bike.nodes,
     window: windowPoints(), course: cfg.course === "loop" || cfg.course === "section" ? cfg.course : "rollers", governor: Boolean(cfg.governor),
+    autoRider: Boolean(ride.rider),
     features: ride.loop?.features ?? null, section: ride.course,
   });
   if (reason) log(reason);
@@ -257,11 +269,14 @@ function governed(keys, speed) {
   };
 }
 
-// The input for the next batch, from the keys and the last observed speed; a change goes into the event log.
+// The input for the next batch, from the keys, the last observed speed and (when on) the auto rider's decision from the last
+// observation; a change goes into the event log.
 function applyInput() {
-  const next = governed(input, ride.speed);
+  const keys = governed(input, ride.speed);
+  const next = ride.rider ? combine(keys, ride.rider.decide(ride.lastObs)) : { ...keys, riderTarget: 0, riderForce: 0 };
   const a = ride.applied;
-  if (next.drive !== a.drive || next.frontBrake !== a.frontBrake || next.rearBrake !== a.rearBrake) {
+  if (next.drive !== a.drive || next.frontBrake !== a.frontBrake || next.rearBrake !== a.rearBrake ||
+      next.riderTarget !== a.riderTarget || next.riderForce !== a.riderForce) {
     ride.applied = next;
     ride.events.push({ tick: ride.bike.tick, type: "input", ...next });
   }
@@ -277,6 +292,7 @@ function takeSnapshot() {
   ride.snapshots.push({
     tick: bike.tick, bytes: bike.snapshot(), trail: { ...ride.trail }, events: ride.events.length,
     window: { x: ride.window.x.slice(), z: ride.window.z.slice() }, applied: { ...ride.applied }, speed: ride.speed,
+    rider: ride.rider ? { next: ride.rider.next, phase: ride.rider.phase } : null, lastObs: ride.lastObs.slice(),
   });
   if (ride.snapshots.length > SNAPSHOTS_KEPT) ride.snapshots.shift();
   ride.lastSnapshotTick = bike.tick;
@@ -298,6 +314,8 @@ function rewind(seconds) {
   ride.accum = 0;
   ride.applied = { ...pick.applied };
   ride.speed = pick.speed;
+  if (ride.rider && pick.rider) Object.assign(ride.rider, pick.rider);
+  ride.lastObs = pick.lastObs.slice();
   post({ type: "terrain-reset", points: windowPoints() });
   log(`rewound to tick ${pick.tick} (${(pick.tick * ride.dt).toFixed(2)} s): snapshot restored, digest ${ride.bike.digestHex()}`);
   publish(true);
@@ -330,6 +348,7 @@ function stepChunk(n) {
   const obs = bike.observe();
   const casings = bike.casings();
   ride.speed = obs[OBS.speed];
+  ride.lastObs = obs.slice(); // obs itself is transferred to the page
   ensureTerrain(obs);
   if (ride.tracker) track(ride.tracker, obs, bike.info);
   const t2 = performance.now();
@@ -406,6 +425,7 @@ function publish(force, obs = null, casings = null) {
     report: bike.report(),
     section: ride.tracker ? trackerSummary(ride.tracker, obs) : null,
     phantom: ride.phantom ? { done: ride.phantom.done, ok: ride.phantom.ok } : null,
+    rider: ride.rider ? ride.rider.phaseName : null,
     ratio: ride.rideSeconds > 0 ? ride.rideSeconds / Math.max(1e-6, (performance.now() - ride.wallStart) / 1000) : 1,
     events: ride.events.length, at: performance.now(),
     // The engine's own ground height under each tyre's mean contact point, for the view's ground check.
@@ -507,7 +527,7 @@ function finishSection() {
 // one the recording kept.
 function startPhantom(rec) {
   const bike = engine.create(setupFor(rec.cfg, rec.profile));
-  ride.phantom = { rec, bike, ei: 0, input: { drive: 0, frontBrake: 0, rearBrake: 0 }, done: false, ok: null, obs: null };
+  ride.phantom = { rec, bike, ei: 0, input: { ...NO_INPUT }, done: false, ok: null, obs: null };
   applyPhantomEvents(ride.phantom);
   ride.phantom.obs = bike.observe();
   log(`phantom: replaying the recorded run (${rec.endTick} ticks, ${rec.time.toFixed(2)} s, ${rec.events.length} events) beside this ride`);
@@ -517,7 +537,7 @@ function applyPhantomEvents(p) {
   const events = p.rec.events;
   while (p.ei < events.length && events[p.ei].tick <= p.bike.tick) {
     const e = events[p.ei++];
-    if (e.type === "input") p.input = { drive: e.drive, frontBrake: e.frontBrake, rearBrake: e.rearBrake };
+    if (e.type === "input") p.input = inputOf(e);
     else if (e.type === "drop") p.bike.dropBehind(e.x);
     else if (e.type === "loop") p.bike.appendTerrain(engine.provingLoop(e.seed, 5, 0).points);
   }
@@ -540,6 +560,11 @@ function stepPhantom(n) {
 
 // --- replay verification ----------------------------------------------------------------------------------------------
 
+// A logged input event as the input it applied (a recording from before the rider slots has none: zero).
+function inputOf(e) {
+  return { drive: e.drive, frontBrake: e.frontBrake, rearBrake: e.rearBrake, riderTarget: e.riderTarget ?? 0, riderForce: e.riderForce ?? 0 };
+}
+
 // Replays the event log in a second bike up to the current tick and compares digests with the live one.
 function verifyReplay() {
   if (!ride) return;
@@ -548,7 +573,7 @@ function verifyReplay() {
   const events = ride.events.filter((e) => e.tick <= target);
   const copy = engine.create(ride.bike.setup);
   const trail = { x: 5, z: 0, next: 0 };
-  let current = { drive: 0, frontBrake: 0, rearBrake: 0 };
+  let current = { ...NO_INPUT };
   let status = STATUS.ok;
   const t0 = performance.now();
   const advance = (to) => {
@@ -556,7 +581,7 @@ function verifyReplay() {
   };
   for (const e of events) {
     advance(e.tick);
-    if (e.type === "input") current = { drive: e.drive, frontBrake: e.frontBrake, rearBrake: e.rearBrake };
+    if (e.type === "input") current = inputOf(e);
     else if (e.type === "drop") copy.dropBehind(e.x);
     else if (e.type === "loop") copy.appendTerrain(engine.provingLoop(e.seed, trail.x, trail.z).points);
     else if (e.type === "append") {
