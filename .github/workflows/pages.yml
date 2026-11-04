@@ -26,9 +26,15 @@ jobs:
 
       - uses: actions/configure-pages@v5
 
-      # Development previews stay out of the published site until the ride page ships
-      - name: Exclude development previews
-        run: rm -rf site/dev site/js/flow
+      # The engine release in site/js/flow/engine/ is vendored (never edited by hand). Before anything is published, its files
+      # must match their manifest (size and SHA-256), nothing unlisted may sit beside them, and the module must ride the
+      # reference ride to the digests the manifest records. A mismatch fails the deploy.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify the vendored engine release
+        run: node site/js/flow/engine/verify.mjs site/js/flow/engine
 
       - uses: actions/upload-pages-artifact@v3
         with:

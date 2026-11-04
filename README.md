@@ -6,7 +6,7 @@ GitHub Pages by the Actions workflow.
 ```text
 site/                         everything published (and nothing else)
 ├── index.html                landing page
-├── flow.html                 "Find your flow" setup simulator
+├── flow.html                 "Find your flow": a simplified ride on the engine release below
 ├── 404.html                  self-contained (works at any path depth)
 ├── styles.css                Contour brand tokens; light sand + .dark forest themes
 ├── favicon.svg               brand mark (source: design repo docs/brand/assets/mark.svg)
@@ -14,7 +14,8 @@ site/                         everything published (and nothing else)
 └── js/                       native ES modules, no build step
     ├── util.js               palette, PRNG, canvas sizing, formatting, visibility helper
     ├── page.js               header state and scroll reveals (every page)
-    ├── simulator.js          flow.html simulator
+    ├── flow-ride.js          flow.html: the ride page (worker, view, phantom, splits, setup controls)
+    ├── flow/engine/          the VENDORED engine release: module, client, manifest, licence (see "The engine release")
     └── hero/                 index.html hero: one terrain, seen from above
         ├── trail.js          seeded meandering trail and queries along it
         ├── terrain.js        height grid built around the trail; contours and map drawing
@@ -22,6 +23,38 @@ site/                         everything published (and nothing else)
         └── scene.js          layout, canvases, particle flow, render loop, HUD, input
 .github/workflows/pages.yml   deploys site/ on push to main
 ```
+
+## The engine release (flow.html)
+
+`flow.html` runs a real physics model of a generic trail bike in a web worker. The model is a compiled WebAssembly build of
+KismoTech's engine. It is **vendored**: `site/js/flow/engine/` holds the release, and it arrives only through the engine's
+release script (`publish.py` in the engine repository, run on a local machine). **Never edit
+those files by hand**: the manifest's hashes and the Pages workflow's verify step would reject the change.
+
+```text
+site/js/flow/engine/
+├── phantomflow_engine.mjs/.wasm   the stripped module (no debug info, names or host paths; ~440 KB)
+├── engine.js worker.js view.js    the client: module wrapper, physics worker (clock, section timing, phantom), side-on view
+│   reference.js session.js
+├── manifest.json                  engine version, flow API layout, reference-ride digests, file sizes and SHA-256, licence
+├── verify.mjs                     the check the Pages workflow runs (plain Node): hashes, then the reference ride
+└── LICENSE.txt                    compiled build, all rights reserved (not the site's open fonts' licence)
+```
+
+- **Updating the engine:** `publish.py` builds, proves (Node gate, native digests), copies, writes the manifest, runs the
+  private-names guard and leaves the change staged or committed on a local branch. Review it, then push. It refuses to run if
+  this folder has uncommitted changes.
+- **The Pages workflow** runs `node site/js/flow/engine/verify.mjs` before it uploads: sizes and SHA-256 must match the
+  manifest, no unlisted file may sit in the folder, and the reference ride must reproduce the manifest's digests. A mismatch
+  fails the deploy.
+- **The site's own code** for the page is `js/flow-ride.js` and `flow.html`. It only uses the client's public pieces
+  (`RideView`, the worker messages, `BestRun`).
+- **The phantom** is the best finished run, kept in this browser's local storage (nothing is sent anywhere) as its setup and
+  input log, and replayed exactly in a second bike. It is tied to the engine version that recorded it.
+- **Profile:** the page runs the Ambient profile (the section is qualified on it). The ride degrades honestly: if WebAssembly,
+  web workers or module workers are missing, it says so and the rest of the site works unchanged.
+- The full Ride page (every control, the run report, the proving loop, a replay check) is the engine repository's
+  demonstrator; this page is a simplified version of it.
 
 ## Preview locally
 
@@ -62,7 +95,8 @@ This repo is **public**. Content describes **benefits only**. Do not mention:
 - anything from the private design repo.
 
 The core approach may be patentable, and public disclosure before filing can destroy novelty.
-The simulator is a generic spring-damper model, so it reveals nothing about how PhantomFlow measures.
+The ride is a physics model of a generic trail bike (suspension, tyres, rigid ground), so it reveals nothing about how
+PhantomFlow measures, and the engine files carry no names of private repositories (the guard below checks).
 
 ## Design notes
 

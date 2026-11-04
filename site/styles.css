@@ -304,6 +304,48 @@ input[type="range"]:focus-visible { outline: none; }
 @media (max-width: 520px) { .fusion-list { grid-template-columns: 1fr; } }
 .flow-cta { display: flex; justify-content: center; flex-wrap: wrap; gap: 14px; margin-top: 30px; }
 
+/* Ride panel (flow page): the engine's bike drawn on a canvas, beside the phantom */
+.ride-canvas {
+  --pg-sky: #1b2d25; --pg-ground: #3b3124; --pg-ground-line: #9a8462; --pg-tyre: #0a0b0b; --pg-rim: #aab3b8; --pg-spoke: #8b959b;
+  --pg-frame: #E2602C; --pg-swingarm: #EE7A48; --pg-stanchion: #e2e8ec; --pg-lowers: #56707c; --pg-shock-body: #7b8d96; --pg-spring: #fbbf24;
+  --pg-arrow: #A9C79C; --pg-plate: #172620; --pg-fg: #E9E2D2; --pg-muted: #B9C2B4; --pg-danger: #FF7A70; --pg-gauge: rgba(233, 226, 210, 0.18);
+  --pg-ghost: #E9E2D2;
+  background: #1b2d25; touch-action: pan-y;
+}
+.ride-stage { position: relative; }
+.ride-card { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 18px;
+  padding: 14px 18px; border-radius: 14px; background: rgba(21, 36, 29, .93); border: 1px solid var(--hair-2); backdrop-filter: blur(6px); }
+.ride-card[hidden] { display: none; }
+.ride-card strong { display: block; font-stretch: 112%; font-size: 1.02rem; line-height: 1.25; }
+.ride-card p { margin: 4px 0 0; color: var(--muted); font-size: .9rem; line-height: 1.45; max-width: 52em; }
+.ride-card .btn { padding: 12px 20px; }
+.ride-card.is-bad strong { color: var(--loss); }
+.ride-card.is-good strong { color: var(--gain); }
+.ride .splits .d { display: block; font: 500 .68rem/1.2 var(--mono); margin-top: 4px; text-align: right; color: var(--dim); }
+.ride .splits li { align-items: flex-start; }
+.ride .splits li b { text-align: right; }
+.ride .splits .d.gain { color: var(--gain); } .ride .splits .d.loss { color: var(--loss); }
+.ride-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin: 0 0 24px; }
+.ride-actions .btn { padding: 12px 22px; user-select: none; -webkit-user-select: none; touch-action: none; }
+.ride-actions .btn.is-held { background: var(--oxide); border-color: var(--oxide); color: var(--oxide-ink); }
+.ride-hint { text-transform: none; letter-spacing: .02em; font-size: .74rem; }
+kbd { font: 600 .72rem/1 var(--mono); padding: 3px 6px; border-radius: 6px; border: 1px solid var(--hair-2); color: var(--muted); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--hair-2); border-radius: 999px; overflow: hidden; }
+.seg-btn { font: 600 .88rem/1 var(--font); padding: 11px 12px; background: transparent; color: var(--muted); border: 0; cursor: pointer; transition: background .2s, color .2s; }
+.seg-btn.is-on { background: var(--oxide); color: var(--oxide-ink); }
+.seg-btn:not(.is-on):hover { color: var(--text); }
+.controls { grid-template-columns: 1.1fr 1fr 1fr; }
+.ride-note { margin: 18px 0 0; color: var(--dim); font: 500 .74rem/1.5 var(--mono); letter-spacing: .02em; }
+.ride-note:empty { display: none; }
+.ride-fallback { color: var(--loss); font: 400 .95rem/1.5 var(--font); }
+@media (max-width: 860px) { .controls { grid-template-columns: 1fr; } }
+@media (max-width: 760px) {
+  .ride .tuner-canvas { height: clamp(260px, 62vw, 340px); }
+  .ride-card { position: static; margin-top: 10px; padding: 12px 14px; }
+  .ride-card .btn { width: 100%; justify-content: center; }
+  .ride-actions .btn { flex: 1 1 40%; justify-content: center; }
+}
+
 /* ── Reveal on scroll ───────────────────────────── */
 .js .reveal { opacity: 0; transform: translateY(24px); transition: opacity .9s var(--ease), transform .9s var(--ease); transition-delay: var(--d, 0s); }
 .js .reveal.is-visible { opacity: 1; transform: none; }
