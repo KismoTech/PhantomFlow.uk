@@ -5,8 +5,8 @@
 // and its moving coordinates (flow_observe: pose, fork travel, swingarm angle, wheel rotation, tyre nodes). Nothing here
 // moves on its own and nothing is guessed: the fork slides by the reported travel, the swingarm turns about the real
 // pivot, the shock runs between its real eyes. The frame tubes are an outline the engine derives from those points.
-// The rider is a hook: `riderLayer` (see draw()); `simpleRider` below is a plain one, a marker for the model's rider (a body on a
-// slide), not a figure that moves on its own. A frame may carry a `ghost` (a second bike's observation,
+// The rider is a hook: `riderLayer` (see draw()); `simpleRider` below draws a figure on the bike's contact points, moved by the
+// model's rider slide alone (riderPose says how); it is a drawing, not part of the model. A frame may carry a `ghost` (a second bike's observation,
 // the phantom's), drawn as a translucent silhouette behind the bike; `markers` ([{x, label}]) draw lines on the ground.
 import { OBS, INFO } from "./engine.js";
 
@@ -61,6 +61,8 @@ export class RideView {
     this.px = 0;
     this.py = 0;
     this.colors = {};
+    this.colorsComplete = false;
+    this.colorReads = 0;     // draws that re-read the palette (see draw)
     this.readColors();
     // Colours follow the page's theme tokens; re-read when the colour scheme changes.
     if (window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.readColors());
@@ -70,7 +72,13 @@ export class RideView {
   /** Reads the palette from the page's CSS custom properties (--pg-*), which switch with the colour scheme. */
   readColors() {
     const style = getComputedStyle(this.canvas);
-    for (const name of PALETTE) this.colors[name] = style.getPropertyValue(`--pg-${name}`).trim() || "#888";
+    let found = 0;
+    for (const name of PALETTE) {
+      const value = style.getPropertyValue(`--pg-${name}`).trim();
+      if (value) found++;
+      this.colors[name] = value || "#888";
+    }
+    this.colorsComplete = found === PALETTE.length;
   }
 
   /** Fits the canvas backing store to its CSS size at the device pixel ratio. */
@@ -258,6 +266,13 @@ export class RideView {
    */
   draw(nowMs, hud = {}) {
     this.resize();
+    // The constructor can run before the page's stylesheet applies (a cold or stale cache), so the palette it read may be the
+    // grey fallback: read it again on the first draw, and on each draw after until every token has a value (a bounded number
+    // of tries, in case a page defines only some of them).
+    if ((this.colorReads === 0 || !this.colorsComplete) && this.colorReads < 240) {
+      this.colorReads++;
+      this.readColors();
+    }
     const have = this.current(nowMs);
     const { ctx, canvas, colors } = this;
     const W = canvas.width, H = canvas.height, d = this.dpr;
@@ -634,10 +649,79 @@ function geometryFrom(info) {
   };
 }
 
+// --- the drawn rider ---------------------------------------------------------------------------------------------------------
+//
+// The model's rider is one body on a slide along the frame's vertical axis (obs riderOffset q; riderX, riderZ is its centre of
+// mass, which the model puts at the frame origin plus q: mid-frame, near the shock, about 0.3 m above the bottom bracket, not
+// over the saddle). The drawing is a cosmetic figure that follows the model through q alone, and is not the model's mass:
+//   hip   = the seated hip + (0, q): over the saddle, its height above the seated height is the slide offset, in the frame's
+//           axes (q = 0, the engine's neutral target, is seated; the passive rider sags to about -0.06 and crouches a little);
+//   feet  on the pedals at the bottom bracket, hands on the grips above the head tube's top: the contact points, fixed on the frame;
+//   legs and arms: two-segment limbs solved by 2-bone IK between hip or shoulder and the contact point; the torso is a fixed
+//           length from the hip towards the bars, its lean set by the arms' preferred reach.
+// Nothing here is fed back to the engine.
+const SADDLE_POST = 0.17;     // m: seat post beyond the seat tube's top (drawn)
+const HIP_ABOVE_SADDLE = 0.1; // m: seated hip joint above the saddle
+const THIGH = 0.46, SHIN = 0.46, TORSO = 0.52, UPPER_ARM = 0.3, FOREARM = 0.3;
+const ARM_REACH = 0.57;       // m: the preferred shoulder-to-grip distance (elbows slightly bent)
+const HEAD_RADIUS = 0.1;
+
+/** The anchor points on the frame the rider is drawn on, frame-local, from the geometry. */
+export function riderAnchors(g) {
+  const ux = g.seatTop[0] - g.bb[0], uz = g.seatTop[1] - g.bb[1], ul = Math.hypot(ux, uz);
+  const saddle = [g.seatTop[0] + SADDLE_POST * ux / ul, g.seatTop[1] + SADDLE_POST * uz / ul];
+  return {
+    saddle,
+    hipSeated: [saddle[0] - 0.02, saddle[1] + HIP_ABOVE_SADDLE],
+    pedal: [g.bb[0] + 0.02, g.bb[1] + 0.05],
+    grip: [g.headTop[0] - 0.03, g.headTop[1] + 0.09],
+  };
+}
+
+// The joint of a two-bone limb from root a to reach b: the point at l1 from a and l2 from b on the side `side` (+1 the left of
+// a-to-b, -1 the right); the reach is clamped to the limb's length (a straight limb).
+function bend(a, b, l1, l2, side) {
+  const dx = b[0] - a[0], dz = b[1] - a[1];
+  const d = Math.min(Math.max(Math.hypot(dx, dz), Math.abs(l1 - l2) + 1e-6), (l1 + l2) * 0.9999);
+  const ux = dx / (Math.hypot(dx, dz) || 1), uz = dz / (Math.hypot(dx, dz) || 1);
+  const along = (l1 * l1 - l2 * l2 + d * d) / (2 * d);
+  const h = Math.sqrt(Math.max(0, l1 * l1 - along * along));
+  return [a[0] + along * ux - side * h * uz, a[1] + along * uz + side * h * ux];
+}
+
 /**
- * A simple rider for `riderLayer`: the model's rider is one body on a slide along the frame's vertical axis, so this draws a
- * marker for it, not a figure with joints of its own. The hip is the body's centre (obs riderX, riderZ, so it rides up and down
- * the slide exactly as the engine moves it); the legs run to the bottom bracket, the arms to the bars, the head above.
+ * The rider's pose for slide offset q: hip, knee, foot (the pedal), shoulder, elbow, hand (the grip) and head, frame-local.
+ * Pure geometry: the hip's height above its seated height is exactly q.
+ * @param {object} g The geometry (geometryFrom).
+ * @param {number} q The slide offset [m] (obs riderOffset).
+ */
+export function riderPose(g, q) {
+  const k = riderAnchors(g);
+  const hip = [k.hipSeated[0], k.hipSeated[1] + q];
+  const foot = k.pedal, hand = k.grip;
+  // The knee goes forward of the hip-to-pedal line (with the foot below, side +1 is the +x side).
+  const knee = bend(hip, foot, THIGH, SHIN, 1);
+  // The shoulder: TORSO from the hip, ARM_REACH from the grip, the higher of the two.
+  const sx = hand[0] - hip[0], sz = hand[1] - hip[1], d = Math.hypot(sx, sz);
+  let shoulder;
+  if (d >= TORSO + ARM_REACH || d <= Math.abs(TORSO - ARM_REACH)) {
+    shoulder = [hip[0] + TORSO * sx / d, hip[1] + TORSO * sz / d];
+  } else {
+    const along = (TORSO * TORSO - ARM_REACH * ARM_REACH + d * d) / (2 * d);
+    const h = Math.sqrt(TORSO * TORSO - along * along);
+    const ux = sx / d, uz = sz / d;
+    shoulder = [hip[0] + along * ux - h * uz, hip[1] + along * uz + h * ux];
+    if (shoulder[1] < hip[1] + along * uz - h * ux) shoulder = [hip[0] + along * ux + h * uz, hip[1] + along * uz - h * ux];
+  }
+  // The elbow drops below the shoulder-to-grip line.
+  const elbow = bend(shoulder, hand, UPPER_ARM, FOREARM, hand[0] >= shoulder[0] ? -1 : 1);
+  const tx = shoulder[0] - hip[0], tz = shoulder[1] - hip[1], tl = Math.hypot(tx, tz);
+  const head = [shoulder[0] + HEAD_RADIUS * 1.25 * tx / tl, shoulder[1] + HEAD_RADIUS * 1.25 * tz / tl + 0.03];
+  return { hip, knee, foot, shoulder, elbow, hand, head, saddle: k.saddle };
+}
+
+/**
+ * The rider for `riderLayer`: a figure on the bike's contact points (see riderPose), the saddle on its post.
  * @param {RideView} view
  * @param {Float64Array} obs
  */
@@ -645,25 +729,20 @@ export function simpleRider(view, obs) {
   const g = view.g;
   if (!g) return;
   const t = view.tx;
-  // World to frame-local: the inverse of loc's turn.
-  const dx = obs[OBS.riderX] - t.ox, dz = obs[OBS.riderZ] - t.oz;
-  const hx = dx * t.c - dz * t.s, hz = dx * t.s + dz * t.c;
-  const [bx, bz] = g.bb;
-  const barX = g.headTop[0] - 0.03, barZ = g.headTop[1] + 0.1;
-  const shX = hx + 0.55 * (barX - hx), shZ = hz + 0.42;
-  // The knee bends forward of the hip-to-pedal line, by what the leg's length leaves over.
-  const legX = bx - hx, legZ = bz - hz, leg = Math.hypot(legX, legZ);
-  const bend = Math.sqrt(Math.max(0, 0.9 * 0.9 - leg * leg)) / 2;
-  const kx = hx + legX / 2 + bend * (-legZ / leg), kz = hz + legZ / 2 + bend * (legX / leg);
-  const elX = (shX + barX) / 2 - 0.02, elZ = (shZ + barZ) / 2 - 0.06;
+  const p = riderPose(g, obs[OBS.riderOffset]);
   const color = view.colors.fg;
-  view.ctx.globalAlpha = 0.85;
-  view.seg(hx, hz, kx, kz, 0.07, color);
-  view.seg(kx, kz, bx, bz, 0.055, color);
-  view.seg(hx, hz, shX, shZ, 0.09, color);
-  view.seg(shX, shZ, elX, elZ, 0.045, color);
-  view.seg(elX, elZ, barX, barZ, 0.04, color);
-  view.loc(shX + 0.07, shZ + 0.17);
-  view.circle(view.px, view.py, 0.1 * t.scale, color, null, 0);
-  view.ctx.globalAlpha = 1;
+  const ctx = view.ctx;
+  ctx.globalAlpha = 0.85;
+  // The post and saddle (the frame's seat tube ends at seatTop).
+  view.seg(g.seatTop[0], g.seatTop[1], p.saddle[0], p.saddle[1], 0.026, view.colors.frame);
+  view.seg(p.saddle[0] - 0.07, p.saddle[1] + 0.02, p.saddle[0] + 0.1, p.saddle[1] + 0.025, 0.04, view.colors.frame);
+  view.seg(p.hip[0], p.hip[1], p.knee[0], p.knee[1], 0.085, color);
+  view.seg(p.knee[0], p.knee[1], p.foot[0], p.foot[1], 0.06, color);
+  view.seg(p.foot[0] - 0.05, p.foot[1] + 0.01, p.foot[0] + 0.14, p.foot[1] + 0.01, 0.045, color);
+  view.seg(p.hip[0], p.hip[1], p.shoulder[0], p.shoulder[1], 0.14, color);
+  view.seg(p.shoulder[0], p.shoulder[1], p.elbow[0], p.elbow[1], 0.055, color);
+  view.seg(p.elbow[0], p.elbow[1], p.hand[0], p.hand[1], 0.045, color);
+  view.loc(p.head[0], p.head[1]);
+  view.circle(view.px, view.py, HEAD_RADIUS * t.scale, color, null, 0);
+  ctx.globalAlpha = 1;
 }

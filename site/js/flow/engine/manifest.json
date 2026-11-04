@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "engine": {
-    "release": 2,
-    "version": "2+c36cf16b18c2"
+    "release": 3,
+    "version": "3+c36cf16b18c2"
   },
   "flowApiLayout": 4,
   "reference": {
@@ -14,7 +14,7 @@
   "build": {
     "date": "2026-11-04"
   },
-  "bundleSha256": "9ba901795c8afa69b570b2ef31e68d08d1b5c660b36d33006a4b6d4ba075ce35",
+  "bundleSha256": "c226cc8818717951edd23accbe07804bfd461dc49b87634b2a8af91d625b349a",
   "licence": {
     "notice": "Compiled build of KismoTech's proprietary physics engine and its client modules. Copyright (c) 2026 KismoTech. All rights reserved: published only so that this website runs in the browser; see LICENSE.txt.",
     "file": "LICENSE.txt"
@@ -62,8 +62,8 @@
     },
     {
       "path": "view.js",
-      "bytes": 31082,
-      "sha256": "c87e5e2f15cd2bd672f0bf363527e85d32667454f5f24fe204410c4056747e42"
+      "bytes": 35871,
+      "sha256": "6d5d59e08ec7b7f06ba560a40ad68e329c05e94f3ab28af950f674934a219c6e"
     },
     {
       "path": "worker.js",
