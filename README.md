@@ -81,3 +81,9 @@ The simulator is a generic spring-damper model, so it reveals nothing about how 
 - [ ] Add `site/CNAME` containing `phantomflow.uk`, set the DNS records, and tick *Enforce HTTPS*.
 - [ ] Replace the contact placeholder in `site/index.html` (search for `CONTACT:`) with a mailbox or form link.
 - [ ] Add `og:image` and `og:url` once the domain is live.
+
+## Local push guard
+
+`.githooks/pre-push` refuses a push that names a private repository. Activate it once per clone with
+`git config core.hooksPath .githooks`. It needs the family's `tools/ci/private_names.py` (a sibling clone of
+`CraigHutchinson/.github`, or `KISMO_CI_DIR`) and a local, untracked list of names; without them it warns and lets the push through.
