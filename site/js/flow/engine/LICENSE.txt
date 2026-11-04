@@ -1,0 +1,16 @@
+PhantomFlow engine: compiled build and client modules
+Copyright (c) 2026 KismoTech. All rights reserved.
+
+The WebAssembly module (phantomflow_engine.wasm and its loader phantomflow_engine.mjs) is a compiled build of
+KismoTech's proprietary physics engine, and the JavaScript modules beside it are its client. They are published only so that
+this website can run in your browser.
+
+You may load and run them, in your browser, to use this website. No other right is granted: you may not copy, redistribute,
+host, modify, translate, decompile, disassemble or reverse engineer them, or use them to build a competing product or service,
+without KismoTech's written permission.
+
+This notice is deliberately different from the rest of the site's content, which carries only the site's copyright line. The
+fonts in ../../../fonts keep their own open licences.
+
+The files are provided as they are, without warranty of any kind. The simulation is an illustrative model of a generic trail
+bike; it is not a measurement of any real bike or rider.

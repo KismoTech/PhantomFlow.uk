@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "engine": {
+    "release": 1,
+    "version": "1+8c6f59211383"
+  },
+  "flowApiLayout": 3,
+  "reference": {
+    "interactive": "37aa99e9c78f15eb",
+    "ambient": "6e09e4113d4731d5",
+    "seed": 12345,
+    "ticks": 19200
+  },
+  "build": {
+    "date": "2026-11-04"
+  },
+  "bundleSha256": "5fd1ec350270a9ff49c7294ccb198a31aa1fc2df7c36e4ec3e3d4b467ae68865",
+  "licence": {
+    "notice": "Compiled build of KismoTech's proprietary physics engine and its client modules. Copyright (c) 2026 KismoTech. All rights reserved: published only so that this website runs in the browser; see LICENSE.txt.",
+    "file": "LICENSE.txt"
+  },
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "bytes": 1034,
+      "sha256": "3bdbf6ec24539655d5394d20c65a1cd1016e9223c362d91c83d3d386a8fb1444"
+    },
+    {
+      "path": "engine.js",
+      "bytes": 14736,
+      "sha256": "7fde97d660b4f9ca2f952c81875e59ec1197c8ebe8c256d602245e562db4a76f"
+    },
+    {
+      "path": "phantomflow_engine.mjs",
+      "bytes": 9271,
+      "sha256": "609d41488cdb29fcfde14dd0a2d4ad91b6cd6fca892a4a8713761e2671ee0bc3"
+    },
+    {
+      "path": "phantomflow_engine.wasm",
+      "bytes": 442347,
+      "sha256": "8c6f59211383c9b70bbc807ecd807bc5bfbb9d85d4a3b2921e52a35f1ad38352"
+    },
+    {
+      "path": "reference.js",
+      "bytes": 3065,
+      "sha256": "07f12d1f0c9f18ca6f70e04b8cc0647c9c50db9bdda567f006994612ede9c04a"
+    },
+    {
+      "path": "session.js",
+      "bytes": 1753,
+      "sha256": "86939d4d13645394a756d67edc537c702949977efd9b9ca643bf5923882cdf12"
+    },
+    {
+      "path": "verify.mjs",
+      "bytes": 3323,
+      "sha256": "a49626aa86b26068fe9ee3e4b7c0adbb920560780dc9c47b41891269c0f0984e"
+    },
+    {
+      "path": "view.js",
+      "bytes": 29312,
+      "sha256": "d7d0db5c988ad043f5c42c545a85cd7dfbc6f1fda8a2543d8ae4e617bd747962"
+    },
+    {
+      "path": "worker.js",
+      "bytes": 28546,
+      "sha256": "e5a7d6af9f6aaf5554bcd94f64276ecfa7624a72e231209964b2caf6f56f4a61"
+    }
+  ]
+}
