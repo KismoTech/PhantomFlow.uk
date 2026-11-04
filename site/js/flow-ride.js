@@ -8,7 +8,8 @@
 //   pick it. The worker still measures its own cost; if this device cannot keep up, the page says so (times stay exact either way).
 // - The auto rider is on: a simple scripted rider (js/flow/engine/rider_mvp.js) that soaks up the jump's lip and levels the
 //   bike in the air with the pedals and the rear brake. It acts only through the bike, within force and power limits, and its
-//   actions are part of the recorded inputs, so the phantom replays them exactly. The page draws a marker for it.
+//   actions are part of the recorded inputs, so the phantom replays them exactly. The page draws a figure for it, on the bike's saddle,
+//   pedals and grips, moved by the rider slide.
 // - Nothing leaves the browser. The best run is kept in this browser's local storage only (js/flow/engine/session.js).
 import { RideView, simpleRider } from "./flow/engine/view.js";
 import { OBS, STOP_KIND_NAMES } from "./flow/engine/engine.js";
