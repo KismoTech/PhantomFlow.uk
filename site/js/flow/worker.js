@@ -10,7 +10,7 @@
 //   second bike and its digest compared: that is the "verify replay" control.
 // - A speed governor holds the ride at SPEED_LIMIT: above it the drive is cut and the brakes are held. The 3% stand-in trail
 //   otherwise runs the bike up to about 7 m/s, where a landing passes the model's contact-overlap guard and ends the ride
-//   (BikeDynamics tests/test_flow_api.cpp, "the page's ride"). The event log records the input applied, governor included.
+//   (the engine's native test of "the page's ride"). The event log records the input applied, governor included.
 import { loadEngine, defaultSetup, PROFILE, STATUS, OBS, INFO, GUARD_NAMES } from "./engine.js";
 
 const SEED = 20260;          // the ride's trail seed (any 32-bit value)
@@ -204,7 +204,7 @@ function setInput(msg) {
   input = { drive: msg.drive ?? 0, frontBrake: msg.frontBrake ?? 0, rearBrake: msg.rearBrake ?? 0 };
 }
 
-// The governor (mirrored by BikeDynamics' PageRide::govern): above SPEED_LIMIT no drive, and at least GOVERNOR's brakes.
+// The governor (mirrored by the engine's native page-ride test): above SPEED_LIMIT no drive, and at least GOVERNOR's brakes.
 function governed(keys, speed) {
   if (!(speed > SPEED_LIMIT)) return { ...keys };
   return {
