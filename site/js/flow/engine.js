@@ -4,7 +4,9 @@
 //
 // The module is a development preview and is not published: see site/dev/README.md.
 
-export const API_VERSION = 1;
+// The layout version: must equal FLOW_API_VERSION in the module's flow_api.h. It changes whenever the observation or the
+// static information gains, loses or moves an entry, so a page never reads a module it does not match.
+export const API_VERSION = 2;
 
 // Layout of the engine's records (mirrors flow_api.h; checked against the module at load).
 export const SETUP_BYTES = 88;
@@ -15,11 +17,16 @@ export const OBS = Object.freeze({
   frontX: 9, frontZ: 10, frontAngle: 11, rearX: 12, rearZ: 13, rearAngle: 14,
   forkTravel: 15, rearTravel: 16, riderOffset: 17, speed: 18, verticalSpeed: 19,
   frontLoad: 20, rearLoad: 21, frontDrag: 22, rearDrag: 23, frontContacts: 24, rearContacts: 25,
-  terrainFirstX: 26, terrainLastX: 27, count: 28,
+  terrainFirstX: 26, terrainLastX: 27, swingAngle: 28,
+  frontContactX: 29, frontContactZ: 30, rearContactX: 31, rearContactZ: 32, count: 33,
 });
 export const INFO = Object.freeze({
   step: 0, nodes: 1, wheelRadius: 2, rimRadius: 3, forkTravel: 4, shockTravel: 5, riderTravel: 6, mass: 7,
-  headAxisX: 8, headAxisZ: 9, budget: 10, count: 11,
+  headAxisX: 8, headAxisZ: 9, budget: 10, full: 11,
+  frontAxleX: 12, frontAxleZ: 13, rearAxleX: 14, rearAxleZ: 15, pivotX: 16, pivotZ: 17,
+  shockFrameX: 18, shockFrameZ: 19, shockArmX: 20, shockArmZ: 21, shockRest: 22,
+  bbX: 23, bbZ: 24, headBottomX: 25, headBottomZ: 26, headTopX: 27, headTopZ: 28,
+  seatJointX: 29, seatJointZ: 30, seatTopX: 31, seatTopZ: 32, count: 33,
 });
 export const STATUS = Object.freeze({ ok: 0, guard: 1, arg: -1, setup: -2, fault: -3, rider: -4, terrain: -5, buffer: -6 });
 export const PROFILE = Object.freeze({ interactive: 0, ambient: 1 });
@@ -61,7 +68,9 @@ export async function loadEngine(moduleUrl, options = {}) {
 export class FlowEngine {
   constructor(module) {
     this.m = module;
-    if (module._flow_version() !== API_VERSION) throw new Error(`engine API version ${module._flow_version()}, expected ${API_VERSION}`);
+    if (module._flow_version() !== API_VERSION) {
+      throw new Error(`The engine module is layout version ${module._flow_version()} but this page needs ${API_VERSION}. Rebuild the module and copy it to site/dev/wasm/ (see site/dev/README.md).`);
+    }
     const p = module._malloc(24);
     module._flow_layout(p);
     const layout = Array.from(module.HEAP32.subarray(p >> 2, (p >> 2) + 6));

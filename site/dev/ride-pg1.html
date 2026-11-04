@@ -7,7 +7,15 @@
   <title>Ride PG1 · development preview</title>
   <style>
     :root { color-scheme: light dark; --bg: #f4efe6; --fg: #14211b; --muted: #5b6a62; --line: #c9c0ae; --accent: #c2410c; --panel: #fffaf0; }
-    @media (prefers-color-scheme: dark) { :root { --bg: #111c17; --fg: #e8efe9; --muted: #96a89d; --line: #2c3d34; --accent: #f97316; --panel: #172620; } }
+    :root { --pg-sky: #dbe9ec; --pg-ground: #7a6850; --pg-ground-line: #3a2d1d; --pg-tyre: #1d1f1e; --pg-rim: #8a9399; --pg-spoke: #6d777d;
+      --pg-frame: #c2410c; --pg-swingarm: #9a3412; --pg-stanchion: #cfd5d9; --pg-lowers: #2b3a42; --pg-shock-body: #1f2a30; --pg-spring: #b45309;
+      --pg-arrow: #0e7490; --pg-plate: #fffaf0; --pg-fg: #14211b; --pg-muted: #5b6a62; --pg-danger: #b91c1c; --pg-gauge: rgba(20, 33, 27, 0.16); }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #111c17; --fg: #e8efe9; --muted: #96a89d; --line: #2c3d34; --accent: #f97316; --panel: #172620;
+        --pg-sky: #1a2c33; --pg-ground: #3b3124; --pg-ground-line: #8f7a5c; --pg-tyre: #0a0b0b; --pg-rim: #aab3b8; --pg-spoke: #8b959b;
+        --pg-frame: #f97316; --pg-swingarm: #fb923c; --pg-stanchion: #e2e8ec; --pg-lowers: #56707c; --pg-shock-body: #7b8d96; --pg-spring: #fbbf24;
+        --pg-arrow: #22d3ee; --pg-plate: #172620; --pg-fg: #e8efe9; --pg-muted: #96a89d; --pg-danger: #f87171; --pg-gauge: rgba(232, 239, 233, 0.18); }
+    }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 system-ui, sans-serif; }
     main { max-width: 1100px; margin: 0 auto; padding: 16px; }
