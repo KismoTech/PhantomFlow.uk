@@ -90,6 +90,11 @@ function onFrame(m) {
       const good = gc.maxDrawn < 0.002;
       log(`ground check: drawn ground vs the engine's ground under the contacts, worst ${(gc.maxDrawn * 1000).toFixed(2)} mm; contact vs ground, worst ${(gc.maxContact * 1000).toFixed(1)} mm (${gc.n} samples)`, good ? "ok" : "bad");
     }
+    const lc = view.linkCheck;
+    if (lc.n > 0) {
+      const good = lc.maxShock < 1e-6 && lc.maxRigid < 1e-6 && lc.maxAxle < 1e-6;
+      log(`linkage check: drawn shock length vs rest minus travel, worst ${(lc.maxShock * 1e6).toFixed(2)} um; swingarm rigid, worst ${(lc.maxRigid * 1e6).toFixed(2)} um; axle vs engine hub, worst ${(lc.maxAxle * 1e6).toFixed(2)} um (${lc.n} samples)`, good ? "ok" : "bad");
+    }
   }
   $("o-time").textContent = `${m.obs[OBS.time].toFixed(2)} s`;
   $("o-tick").textContent = String(m.tick);

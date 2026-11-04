@@ -44,7 +44,10 @@ export class RideView {
     this.sag = [0, 0];
     this.groundCheck = { n: 0, maxDrawn: 0, maxContact: 0 };
     this.sagTime = -1;
+    this.zoom = 1;           // a multiplier on the view scale (for close inspection)
     this.riderLayer = null;
+    this.sw = { rx: 0, rz: 0, ex: 0, ez: 0 };
+    this.linkCheck = { n: 0, maxShock: 0, maxRigid: 0, maxAxle: 0 };
     // Scratch, so the draw path allocates nothing per frame.
     this.obs = new Float64Array(OBS.count);
     this.cas = [new Float64Array(0), new Float64Array(0)];
@@ -84,6 +87,7 @@ export class RideView {
     this.renderTime = 0;
     this.sagTime = -1;
     this.groundCheck = { n: 0, maxDrawn: 0, maxContact: 0 };
+    this.linkCheck = { n: 0, maxShock: 0, maxRigid: 0, maxAxle: 0 };
     this.readColors();
   }
 
@@ -123,6 +127,7 @@ export class RideView {
   push(frame) {
     this.frames.push(frame);
     if (frame.ground) this.checkGround(frame);
+    if (this.g) this.checkLinkage(frame.obs);
     if (this.frames.length > FRAMES_KEPT) this.frames.shift();
     const t = frame.simTime;
     const travel = [frame.obs[OBS.forkTravel], frame.obs[OBS.rearTravel]];
@@ -256,7 +261,7 @@ export class RideView {
     }
     const g = this.g, obs = this.obs;
     const narrow = this.canvas.clientWidth < 600;
-    const scale = W / (narrow ? 4.2 : 6.2);
+    const scale = (W / (narrow ? 4.2 : 6.2)) * this.zoom;
     // Camera: follows the frame, looking ahead by a fraction of a second of speed; time-based smoothing.
     const ahead = Math.max(0, Math.min(narrow ? 0.5 : 0.9, obs[OBS.speed] * LOOK_AHEAD)) + (narrow ? 0.2 : 0.4);
     const targetX = obs[OBS.frameX] + ahead, targetZ = obs[OBS.frameZ];
@@ -282,8 +287,8 @@ export class RideView {
 
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    this.drawRear(obs);
     this.drawFrame();
+    this.drawRear(obs);
     this.drawFork(obs[OBS.forkTravel]);
     if (this.riderLayer) this.riderLayer(this, obs);
     this.drawLoads(obs, sx, sz);
@@ -361,29 +366,59 @@ export class RideView {
       this.seg(g.seatJoint[0], g.seatJoint[1], g.rearAxle[0], g.rearAxle[1], 0.026, colors.swingarm);
       return;
     }
-    const a = obs[OBS.swingAngle], c = Math.cos(a), s = Math.sin(a);
+    const { rx, rz, ex, ez } = this.swingPoints(obs[OBS.swingAngle]);
     const [px, pz] = g.pivot;
-    // Rotation about +y: x' = x c + z s, z' = -x s + z c (the same turn as the pitch).
-    const ax = g.rearAxle[0] - px, az = g.rearAxle[1] - pz;
-    const rx = px + ax * c + az * s, rz = pz - ax * s + az * c;
-    const ex = px + g.shockArm[0] * c + g.shockArm[1] * s, ez = pz - g.shockArm[0] * s + g.shockArm[1] * c;
-    // Swingarm plate: pivot, shock eye, axle.
+    // The swingarm is one rigid member: chain stay (pivot to axle), the extension (pivot to the shock eye) and a brace (axle
+    // to the eye), all turning with the swing angle about the main pivot.
     ctx.beginPath();
     this.m(px, pz); this.l(ex, ez); this.l(rx, rz); this.l(px, pz);
     ctx.closePath();
     ctx.fillStyle = colors.plate;
-    ctx.globalAlpha = 0.55;
+    ctx.globalAlpha = 0.3;
     ctx.fill();
     ctx.globalAlpha = 1;
-    ctx.strokeStyle = colors.swingarm;
-    ctx.lineWidth = Math.max(2 * dpr, 0.03 * sc);
-    ctx.stroke();
-    // Link from the frame's BB to the pivot.
-    this.seg(g.bb[0], g.bb[1], px, pz, 0.03, colors.frame);
+    this.seg(px, pz, rx, rz, 0.034, colors.swingarm);
+    this.seg(px, pz, ex, ez, 0.034, colors.swingarm);
+    this.seg(rx, rz, ex, ez, 0.022, colors.swingarm);
     this.drawShock(g.shockFrame[0], g.shockFrame[1], ex, ez);
+    this.loc(rx, rz);
+    this.circle(this.px, this.py, Math.max(3 * dpr, 0.02 * sc), colors.swingarm, null, 0);
     this.loc(px, pz);
     this.circle(this.px, this.py, Math.max(4 * dpr, 0.03 * sc), colors.fg, null, 0);
   }
+
+  // The swingarm's moving points, frame-local: the rear axle and the shock eye, both rotated rigidly about the main pivot by
+  // the swing angle (rotation about +y: x' = x c + z s, z' = -x s + z c, the same turn as the pitch). Written into this.sw.
+  swingPoints(a) {
+    const g = this.g, c = Math.cos(a), s = Math.sin(a), [px, pz] = g.pivot;
+    const ax = g.rearAxle[0] - px, az = g.rearAxle[1] - pz;
+    const out = this.sw;
+    out.rx = px + ax * c + az * s; out.rz = pz - ax * s + az * c;
+    out.ex = px + g.shockArm[0] * c + g.shockArm[1] * s; out.ez = pz - g.shockArm[0] * s + g.shockArm[1] * c;
+    return out;
+  }
+
+  // Per published state: the drawn shock's eye-to-eye length must equal shock rest less the rear travel, and the swingarm eye
+  // must turn rigidly with the axle (their distances from the pivot, and the angle between them, stay as built). Worst errors [m].
+  checkLinkage(o) {
+    const g = this.g, k = this.linkCheck;
+    if (!g.full) return;
+    const w = this.swingPoints(o[OBS.swingAngle]);
+    const len = Math.hypot(w.ex - g.shockFrame[0], w.ez - g.shockFrame[1]);
+    k.maxShock = Math.max(k.maxShock, Math.abs(len - (this.info[INFO.shockRest] - o[OBS.rearTravel])));
+    const [px, pz] = g.pivot;
+    const a0x = g.rearAxle[0] - px, a0z = g.rearAxle[1] - pz, e0x = g.shockArm[0], e0z = g.shockArm[1];
+    const ax = w.rx - px, az = w.rz - pz, ex = w.ex - px, ez = w.ez - pz;
+    const rotated = Math.atan2(ax * ez - az * ex, ax * ex + az * ez), built = Math.atan2(a0x * e0z - a0z * e0x, a0x * e0x + a0z * e0z);
+    k.maxRigid = Math.max(k.maxRigid, Math.abs(Math.hypot(ax, az) - Math.hypot(a0x, a0z)), Math.abs(Math.hypot(ex, ez) - Math.hypot(e0x, e0z)),
+      Math.abs(rotated - built) * Math.hypot(e0x, e0z));
+    // And against the engine's rear hub: the axle must be where the engine says it is (frame-local from the hub's world position).
+    const c = Math.cos(o[OBS.pitch]), sn = Math.sin(o[OBS.pitch]);
+    const dx = o[OBS.rearX] - o[OBS.frameX], dz = o[OBS.rearZ] - o[OBS.frameZ];
+    k.maxAxle = Math.max(k.maxAxle, Math.hypot(dx * c - dz * sn - w.rx, dx * sn + dz * c - w.rz));
+    k.n++;
+  }
+
 
   // The shock: a damper body and shaft with a coil spring between the eyes; it shortens as the swingarm rises.
   drawShock(x0, z0, x1, z1) {
@@ -417,7 +452,12 @@ export class RideView {
     this.seg(g.bb[0], g.bb[1], g.seatTop[0], g.seatTop[1], 0.034, colors.frame);          // seat tube
     this.seg(g.headTop[0], g.headTop[1], g.seatJoint[0], g.seatJoint[1], 0.036, colors.frame); // top tube
     this.seg(g.headBottom[0], g.headBottom[1], g.headTop[0], g.headTop[1], 0.055, colors.frame); // head tube
-    if (g.full) this.seg(g.seatJoint[0], g.seatJoint[1], g.shockFrame[0], g.shockFrame[1], 0.026, colors.frame); // shock mount
+    if (g.full) {
+      // The shock's frame eye is the model's; the down tube carries it on a short gusset (two legs to the tube, about 9 cm).
+      const [a, b] = g.mount;
+      this.seg(a[0], a[1], g.shockFrame[0], g.shockFrame[1], 0.026, colors.frame);
+      this.seg(b[0], b[1], g.shockFrame[0], g.shockFrame[1], 0.026, colors.frame);
+    }
   }
 
   // Stanchions (fixed to the crown) slide in the lowers (on the axle) along the fork axis by the reported travel.
@@ -503,7 +543,14 @@ function geometryFrom(info) {
   const pair = (x, z) => [info[x], info[z]];
   const frontAxle = pair(INFO.frontAxleX, INFO.frontAxleZ);
   const headBottom = pair(INFO.headBottomX, INFO.headBottomZ);
+  // Where the frame's shock eye meets the down tube: the nearest point on the tube and two feet 4 cm either side of it.
+  const bb = pair(INFO.bbX, INFO.bbZ), eye = pair(INFO.shockFrameX, INFO.shockFrameZ);
+  const tx = headBottom[0] - bb[0], tz = headBottom[1] - bb[1], tl = Math.hypot(tx, tz);
+  const ux = tx / tl, uz = tz / tl;
+  const along = Math.min(tl - 0.04, Math.max(0.04, (eye[0] - bb[0]) * ux + (eye[1] - bb[1]) * uz));
+  const mount = [[bb[0] + (along - 0.04) * ux, bb[1] + (along - 0.04) * uz], [bb[0] + (along + 0.04) * ux, bb[1] + (along + 0.04) * uz]];
   return {
+    mount,
     full: info[INFO.full] > 0.5,
     frontAxle, headBottom,
     axis: [info[INFO.headAxisX], info[INFO.headAxisZ]],
