@@ -6,7 +6,7 @@
 
 // The layout version: must equal FLOW_API_VERSION in the module's flow_api.h. It changes whenever the observation or the
 // static information gains, loses or moves an entry, so a page never reads a module it does not match.
-export const API_VERSION = 2;
+export const API_VERSION = 3;
 
 // Layout of the engine's records (mirrors flow_api.h; checked against the module at load).
 export const SETUP_BYTES = 88;
@@ -18,7 +18,7 @@ export const OBS = Object.freeze({
   forkTravel: 15, rearTravel: 16, riderOffset: 17, speed: 18, verticalSpeed: 19,
   frontLoad: 20, rearLoad: 21, frontDrag: 22, rearDrag: 23, frontContacts: 24, rearContacts: 25,
   terrainFirstX: 26, terrainLastX: 27, swingAngle: 28,
-  frontContactX: 29, frontContactZ: 30, rearContactX: 31, rearContactZ: 32, count: 33,
+  frontContactX: 29, frontContactZ: 30, rearContactX: 31, rearContactZ: 32, gates: 33, count: 34,
 });
 export const INFO = Object.freeze({
   step: 0, nodes: 1, wheelRadius: 2, rimRadius: 3, forkTravel: 4, shockTravel: 5, riderTravel: 6, mass: 7,
@@ -32,11 +32,17 @@ export const STATUS = Object.freeze({ ok: 0, guard: 1, arg: -1, setup: -2, fault
 export const PROFILE = Object.freeze({ interactive: 0, ambient: 1 });
 export const SUSPENSION = Object.freeze({ full: 0, hardtail: 1 });
 export const TYRE = Object.freeze({ soft: 0, standard: 1, firm: 2 });
-export const GUARD_NAMES = [
-  "", "nonfinite state", "frame pitch", "fork travel", "shock travel", "rider travel", "wheel separation",
-  "motion resolution", "casing strain", "casing displacement", "casing geometry", "solver fault",
-];
+// Stop gates end a run (a crash, a break, or numerics that cannot continue); quality gates are recorded in the run report
+// and the run goes on. Names come from the module (FlowEngine.guardName, FlowEngine.gateName).
+export const STOP_KIND = Object.freeze({ none: 0, crash: 1, break: 2, numerics: 3 });
+export const STOP_KIND_NAMES = ["", "crash", "break", "numerics"];
+export const GATE = Object.freeze({
+  penetration: 0, pitch: 1, strain: 2, displacement: 3, motion: 4, bottomOut: 5, energy: 6, solver: 7, count: 8,
+});
+export const REPORT_BYTES = 576;
+const GATE_DOUBLES = 8;
 const ROLLER_POINTS = 33;
+const PROVING_FEATURES = 10;
 const MAX_TERRAIN_POINTS = 4096;
 
 /** The setup record's defaults; any field may be overridden. Zero means the engine's default. */
@@ -71,12 +77,55 @@ export class FlowEngine {
     if (module._flow_version() !== API_VERSION) {
       throw new Error(`The engine module is layout version ${module._flow_version()} but this page needs ${API_VERSION}. Rebuild the module and copy it to site/dev/wasm/ (see site/dev/README.md).`);
     }
-    const p = module._malloc(24);
+    const p = module._malloc(32);
     module._flow_layout(p);
-    const layout = Array.from(module.HEAP32.subarray(p >> 2, (p >> 2) + 6));
+    const layout = Array.from(module.HEAP32.subarray(p >> 2, (p >> 2) + 8));
     module._free(p);
-    const expected = [SETUP_BYTES, INPUT_BYTES, OBS.count, INFO.count, 8, 24];
+    const expected = [SETUP_BYTES, INPUT_BYTES, OBS.count, INFO.count, 8, 24, REPORT_BYTES, GATE.count];
     if (layout.some((v, i) => v !== expected[i])) throw new Error(`engine layout ${layout} differs from ${expected}`);
+    this.guardNames = [];
+    for (let c = 0; ; c++) {
+      const name = c === 0 ? "" : module.UTF8ToString(module._flow_guard_name(c));
+      if (c > 0 && name === "") break;
+      this.guardNames.push(name);
+    }
+    this.gateNames = [];
+    for (let g = 0; g < GATE.count; g++) this.gateNames.push(module.UTF8ToString(module._flow_gate_name(g)));
+  }
+
+  /** A stop gate's name ("" for none). */
+  guardName(code) {
+    return this.guardNames[code] ?? "";
+  }
+
+  /** A stop gate's kind (STOP_KIND). */
+  guardKind(code) {
+    return this.m._flow_guard_kind(code);
+  }
+
+  /**
+   * The proving loop: the engine's fixed test course (rollers, rough, a step-up, a jump, a climb, two drops, a compression
+   * and a run-out), identical on every platform. Its first point is beyond x0.
+   * @returns {{points: Float64Array, features: {name: string, start: number, end: number}[], finish: number}}
+   */
+  provingLoop(seed, x0, z0) {
+    const m = this.m;
+    const count = m._flow_proving_loop(seed >>> 0, x0, z0, 0, 0);
+    if (count < 0) throw new Error(`proving loop failed: ${count}`);
+    const p = m._malloc(count * 16);
+    const n = m._flow_proving_loop(seed >>> 0, x0, z0, p, count);
+    if (n !== count) { m._free(p); throw new Error(`proving loop failed: ${n}`); }
+    const points = new Float64Array(m.HEAPF64.buffer, p, n * 2).slice();
+    m._free(p);
+    const r = m._malloc(16);
+    const features = [];
+    for (let f = 0; f < PROVING_FEATURES; f++) {
+      const name = m.UTF8ToString(m._flow_proving_feature(seed >>> 0, f, x0, r));
+      const range = new Float64Array(m.HEAPF64.buffer, r, 2);
+      features.push({ name, start: range[0], end: range[1] });
+    }
+    m._free(r);
+    return { points, features, finish: features[PROVING_FEATURES - 1].end };
   }
 
   /** Builds a bike. Throws with the engine's reason when the setup is refused. */
@@ -119,6 +168,7 @@ export class FlowBike {
     this.obsPtr = m._malloc(OBS.count * 8);
     this.infoPtr = m._malloc(INFO.count * 8);
     this.casingPtr = m._malloc(2 * 128 * 8);
+    this.reportPtr = m._malloc(REPORT_BYTES);
     this.inputCapacity = 0;
     this.inputPtr = 0;
     this.terrainCapacity = 0;
@@ -135,7 +185,7 @@ export class FlowBike {
     const m = this.m;
     if (!this.handle) return;
     m._flow_destroy(this.handle);
-    for (const p of [this.obsPtr, this.infoPtr, this.casingPtr, this.inputPtr, this.terrainPtr, this.snapshotPtr]) if (p) m._free(p);
+    for (const p of [this.obsPtr, this.infoPtr, this.casingPtr, this.reportPtr, this.inputPtr, this.terrainPtr, this.snapshotPtr]) if (p) m._free(p);
     this.handle = 0;
   }
 
@@ -217,6 +267,29 @@ export class FlowBike {
       out.push(new Float64Array(m.HEAPF64.buffer, this.casingPtr, 2 * this.nodes).slice());
     }
     return out;
+  }
+
+  /**
+   * The run report: the stop gate if one ended the run, and every quality gate's record (steps past its limit, when and
+   * where it first passed, its worst value, when and where). Not part of the digest.
+   */
+  report() {
+    const m = this.m;
+    if (m._flow_run_report(this.handle, this.reportPtr) !== STATUS.ok) throw new Error("run report failed");
+    const i32 = new Int32Array(m.HEAPU8.buffer, this.reportPtr, 4);
+    const f64 = new Float64Array(m.HEAPU8.buffer, this.reportPtr, REPORT_BYTES / 8);
+    const gates = [];
+    for (let g = 0; g < i32[3]; g++) {
+      const o = 8 + g * GATE_DOUBLES;
+      gates.push({
+        name: this.engine.gateNames[g], steps: f64[o], timePast: f64[o + 1], firstTime: f64[o + 2], firstX: f64[o + 3],
+        worst: f64[o + 4], worstTime: f64[o + 5], worstX: f64[o + 6], limit: f64[o + 7],
+      });
+    }
+    return {
+      version: i32[0], stopCode: i32[1], stopKind: i32[2], stopName: this.engine.guardName(i32[1]),
+      ticks: f64[2], time: f64[3], stopTime: f64[4], stopX: f64[5], stopValue: f64[6], stopLimit: f64[7], gates,
+    };
   }
 
   get tick() {

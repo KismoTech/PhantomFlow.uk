@@ -36,6 +36,13 @@
     dt { color: var(--muted); }
     dd { margin: 0; font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
     #log { height: 190px; overflow: auto; font: 12px/1.4 ui-monospace, monospace; white-space: pre-wrap; margin: 0; }
+    table { border-collapse: collapse; width: 100%; font: 12px/1.35 ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+    th, td { text-align: left; padding: 2px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    th { color: var(--muted); font-weight: 600; }
+    .table-wrap { overflow-x: auto; }
+    #report p { margin: 0 0 6px; }
+    tr.warn td { color: #b45309; }
+    @media (prefers-color-scheme: dark) { tr.warn td { color: #fbbf24; } }
     .ok { color: #15803d; }
     .bad { color: #b91c1c; }
     @media (prefers-color-scheme: dark) { .ok { color: #4ade80; } .bad { color: #f87171; } }
@@ -57,6 +64,9 @@
   <div class="grid">
     <fieldset id="setup">
       <legend>Setup (changes restart the ride)</legend>
+      <label>Course
+        <select id="course"><option value="rollers">endless rollers (launch 3 m/s)</option><option value="loop">proving loop (launch 10 m/s)</option></select></label>
+      <label><input id="governor" type="checkbox"> Speed governor: hold 5 m/s (optional)</label>
       <label>Profile
         <select id="profile"><option value="auto">auto (by measured cost)</option><option value="interactive">interactive</option><option value="ambient">ambient</option></select></label>
       <label>Frame
@@ -77,10 +87,14 @@
         <dt>cost (worker busy)</dt><dd id="o-busy">-</dd>
         <dt>speed ratio</dt><dd id="o-ratio">-</dd>
         <dt>terrain rebuilds</dt><dd id="o-terrain">-</dd>
-        <dt>guard</dt><dd id="o-guard">-</dd>
+        <dt>stop gate</dt><dd id="o-guard">-</dd>
       </dl>
       <p class="note" id="note">Cost is wall-clock CPU per simulated second in the worker, rolling over 2 s. It measures this device now; it is not a verdict.</p>
     </div>
+    <div class="panel" style="grid-column: 1 / -1"><b>Run report</b>
+      <p class="note">Stop gates (a crash, a break, numerics that cannot continue) end the ride. Quality gates mark the model
+        running outside where it is qualified: recorded here, and the ride goes on. Limits are the engine's and are not loosened.</p>
+      <div class="table-wrap" id="report">-</div></div>
     <div class="panel"><pre id="log" aria-live="polite"></pre></div>
     <div class="panel"><b>Reference ride</b>
       <dl id="ref"><dt>interactive</dt><dd>-</dd><dt>ambient</dt><dd>-</dd></dl></div>

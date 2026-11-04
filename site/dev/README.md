@@ -33,10 +33,19 @@ Pages here are for developing the ride (proving ground, slice PG1). They are not
 - **Digest.** The page shows the determinism digest of the live state. *Verify replay* replays the ride's event log (inputs,
   terrain appends and drops by tick) in a second bike and compares digests. *Run reference ride* rides the engine's fixed
   reference ride and compares its digests with the native build's (`js/flow/reference.js` holds the native values).
-- **Speed governor.** Above 5 m/s (18 km/h) the worker cuts the drive and holds the brakes (20 and 40 N m). Ungoverned, the
-  3% stand-in trail runs the bike up to about 7 m/s, where a landing passes the model's contact-overlap guard
-  (`contact-penetration-limit`) and ends the ride. The event log records the input applied, governor included.
-- **Rewind 3 s** restores a snapshot taken once a second (a guard ends a ride; this is the recovery).
+- **Course.** *Endless rollers* streams the stand-in trail ahead of the bike (launch 3 m/s). *Proving loop* is the
+  engine's fixed test course (slice PG2a): rollers, rounded rough, a step-up, a jump with real airtime, a climb, a drop to
+  flat, a drop to a downslope, a compression and a run-out, launched at 10 m/s. It ends when the frame passes the finish.
+- **Run report.** Every guard is a stop gate or a quality gate. A stop gate (a crash, a break, or numerics that cannot
+  continue) ends the ride at the last accepted state. A quality gate marks the model running outside where it is qualified:
+  rigid-ground overlap past its limit, pitch past the validated envelope, casing strain or displacement past the qualified
+  range, motion per step, bottom-out, energy created, solver load. Each is recorded (steps past its limit, where it first
+  passed, its worst and where) and the ride goes on. The page shows the report live, and the log lists it when the ride ends.
+  The limits are the engine's and are not loosened; the report is not part of the digest.
+- **Speed governor (optional, off by default).** Above 5 m/s (18 km/h) the worker cuts the drive and holds the brakes (20
+  and 40 N m). The event log records the input applied, governor included.
+- **Rewind 3 s** restores a snapshot taken once a second (a stop gate ends a ride; this is the recovery). The run report
+  comes back with the snapshot.
 - Cost numbers measure this device at this moment. They are not a verdict on it.
 
 ## Headless check

@@ -1,6 +1,6 @@
 // Page script for site/dev/ride-pg1.html: starts the physics worker, feeds the view, wires the controls and readouts.
 import { RideView } from "./view.js";
-import { OBS, GUARD_NAMES } from "./engine.js";
+import { OBS, STOP_KIND_NAMES } from "./engine.js";
 
 const $ = (id) => document.getElementById(id);
 const MODULE_URL = new URL("../../dev/wasm/phantomflow_engine.mjs", import.meta.url).href;
@@ -28,6 +28,8 @@ const config = () => ({
   shockRate: Number($("shockRate").value),
   damping: Number($("damping").value),
   speed: 3,
+  course: $("course").value,
+  governor: $("governor").checked,
 });
 
 function showSliders() {
@@ -52,6 +54,8 @@ worker.onmessage = (event) => {
       view.reset(m.info);
       view.setTerrain(m.window);
       $("o-profile").textContent = `${m.profile} (${m.nodes} nodes, step ${(m.dt * 1e6).toFixed(2)} us)`;
+      state.features = m.features;
+      state.reportShown = "";
       break;
     case "terrain": view.appendTerrain(m.points); break;
     case "drop": view.dropTerrain(m.x); break;
@@ -80,7 +84,7 @@ function onFrame(m) {
   state.last = { ...m, obs: Array.from(m.obs) };
   view.push({ obs: m.obs, casings: m.casings, simTime: m.obs[OBS.time], ground: m.ground });
   const now = performance.now();
-  if (now - state.readoutAt < 100) return;
+  if (now - state.readoutAt < 100 && !m.ended) return; // the last frame of a ride always updates the readouts and the report
   state.readoutAt = now;
   const slot = Math.floor(m.obs[OBS.time] / 10);
   if (slot !== state.groundSlot) {
@@ -105,9 +109,39 @@ function onFrame(m) {
   $("o-busy").className = m.costBusy > m.budget ? "bad" : "ok";
   $("o-ratio").textContent = m.ratio.toFixed(3);
   $("o-terrain").textContent = `${m.terrainBuilds} (${m.terrainMs.toFixed(1)} ms total)`;
-  $("o-guard").textContent = m.guard ? `${GUARD_NAMES[m.guard]}: ${m.guardReason}` : "none";
-  $("o-guard").className = m.guard ? "bad" : "";
+  const r = m.report;
+  $("o-guard").textContent = m.guard ? `${r.stopName} (${STOP_KIND_NAMES[r.stopKind]}): ${m.guardReason}` : m.completed ? "none: loop completed" : "none";
+  $("o-guard").className = m.guard ? "bad" : m.completed ? "ok" : "";
+  showReport(r, m.obs[OBS.frameX]);
   $("pause").textContent = m.paused ? "Resume" : "Pause";
+}
+
+// The proving-loop feature at x, for the report's positions ("" on the rollers).
+function featureAt(x) {
+  const f = state.features?.find((g) => x >= g.start && x < g.end);
+  return f ? ` (${f.name})` : "";
+}
+
+// The run report as a compact table: one row per quality gate (limit, worst and where, steps past and the first pass), and
+// the stop gate when one ended the ride. Live, and final once the ride ends.
+function showReport(r, frameX) {
+  const fmt = (v) => (Math.abs(v) >= 0.01 || v === 0 ? v.toFixed(3) : v.toExponential(2));
+  const rows = r.gates.map((g) => {
+    const past = g.steps > 0;
+    return `<tr class="${past ? "warn" : ""}"><td>${g.name}</td><td>${fmt(g.limit)}</td><td>${fmt(g.worst)}</td>` +
+      `<td>${g.worstTime > 0 || g.worst > 0 ? `${g.worstX.toFixed(1)}${featureAt(g.worstX)}` : "-"}</td>` +
+      `<td>${past ? `${g.steps} (${(g.timePast * 1000).toFixed(0)} ms)` : "never"}</td>` +
+      `<td>${past ? `${g.firstX.toFixed(1)}${featureAt(g.firstX)}` : "-"}</td></tr>`;
+  }).join("");
+  const stop = r.stopCode
+    ? `<p class="bad">Stop gate: ${r.stopName} (${STOP_KIND_NAMES[r.stopKind]}) at ${r.stopTime.toFixed(2)} s, x ${r.stopX.toFixed(1)} m${featureAt(r.stopX)}; ${Number.isFinite(r.stopValue) ? `${fmt(r.stopValue)} against ${fmt(r.stopLimit)}` : "no value"}</p>`
+    : `<p>No stop gate. ${r.time.toFixed(2)} s simulated, frame at x ${frameX.toFixed(1)} m${featureAt(frameX)}.</p>`;
+  const html = `${stop}<table><thead><tr><th>quality gate</th><th>limit</th><th>worst</th><th>worst at x [m]</th><th>steps past</th><th>first past at x</th></tr></thead><tbody>${rows}</tbody></table>`;
+  if (html !== state.reportShown) {
+    state.reportShown = html;
+    $("report").innerHTML = html;
+  }
+  state.report = r;
 }
 
 function showReference(results) {
@@ -134,7 +168,7 @@ function scheduleRestart() {
   state.restartTimer = setTimeout(() => { if (state.loaded) start(); }, 250);
 }
 
-for (const id of ["profile", "suspension", "tyre", "forkRate", "shockRate", "damping"]) $(id).addEventListener("input", scheduleRestart);
+for (const id of ["profile", "suspension", "tyre", "forkRate", "shockRate", "damping", "course", "governor"]) $(id).addEventListener("input", scheduleRestart);
 $("restart").addEventListener("click", start);
 $("pause").addEventListener("click", () => { state.paused = !state.paused; worker.postMessage({ type: "pause", paused: state.paused }); });
 $("rewind").addEventListener("click", () => worker.postMessage({ type: "rewind", seconds: 3 }));
@@ -154,7 +188,10 @@ window.addEventListener("keydown", (e) => { if (!e.repeat) key(e, true); });
 window.addEventListener("keyup", (e) => key(e, false));
 
 function frame(now) {
-  view.draw(now, { banner: state.last?.ended ? `Ride ended: ${state.last.guardReason || "guard"}. Rewind or restart.` : "" });
+  const last = state.last;
+  const banner = !last?.ended ? "" : last.completed ? "Proving loop completed. Restart to ride it again."
+    : `Ride stopped: ${last.report.stopName} (${STOP_KIND_NAMES[last.report.stopKind]}). Rewind or restart.`;
+  view.draw(now, { banner });
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
