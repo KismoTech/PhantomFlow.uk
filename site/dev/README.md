@@ -33,6 +33,9 @@ Pages here are for developing the ride (proving ground, slice PG1). They are not
 - **Digest.** The page shows the determinism digest of the live state. *Verify replay* replays the ride's event log (inputs,
   terrain appends and drops by tick) in a second bike and compares digests. *Run reference ride* rides the engine's fixed
   reference ride and compares its digests with the native build's (`js/flow/reference.js` holds the native values).
+- **Speed governor.** Above 5 m/s (18 km/h) the worker cuts the drive and holds the brakes (20 and 40 N m). Ungoverned, the
+  3% stand-in trail runs the bike up to about 7 m/s, where a landing passes the model's contact-overlap guard
+  (`contact-penetration-limit`) and ends the ride. The event log records the input applied, governor included.
 - **Rewind 3 s** restores a snapshot taken once a second (a guard ends a ride; this is the recovery).
 - Cost numbers measure this device at this moment. They are not a verdict on it.
 

@@ -12,8 +12,8 @@ export const DROP_X = 3.0;
 
 // The native tests' digests (the engine's tests/test_flow_api.cpp): GCC, Clang and WebAssembly agree.
 export const EXPECTED = Object.freeze({
-  interactive: "84a71b47cde04a5e",
-  ambient: "85d0e622504f9368",
+  interactive: "37aa99e9c78f15eb",
+  ambient: "6e09e4113d4731d5",
 });
 
 /** Drive in the second second, a brake pulse at the end of each 1.5 s. */
