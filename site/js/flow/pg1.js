@@ -10,6 +10,7 @@ const logEl = $("log");
 const state = { last: null, restartTimer: 0, loaded: false, paused: false, input: { drive: 0, frontBrake: 0, rearBrake: 0 }, readoutAt: 0 };
 // For automated checks from the browser tools.
 window.__pg1 = state;
+state.view = view;
 
 const log = (text, cls = "") => {
   const line = document.createElement("div");
@@ -77,10 +78,19 @@ async function boot() {
 
 function onFrame(m) {
   state.last = { ...m, obs: Array.from(m.obs) };
-  view.push({ obs: m.obs, casings: m.casings, simTime: m.obs[OBS.time] });
+  view.push({ obs: m.obs, casings: m.casings, simTime: m.obs[OBS.time], ground: m.ground });
   const now = performance.now();
   if (now - state.readoutAt < 100) return;
   state.readoutAt = now;
+  const slot = Math.floor(m.obs[OBS.time] / 10);
+  if (slot !== state.groundSlot) {
+    state.groundSlot = slot;
+    const gc = view.groundCheck;
+    if (gc.n > 0) {
+      const good = gc.maxDrawn < 0.002;
+      log(`ground check: drawn ground vs the engine's ground under the contacts, worst ${(gc.maxDrawn * 1000).toFixed(2)} mm; contact vs ground, worst ${(gc.maxContact * 1000).toFixed(1)} mm (${gc.n} samples)`, good ? "ok" : "bad");
+    }
+  }
   $("o-time").textContent = `${m.obs[OBS.time].toFixed(2)} s`;
   $("o-tick").textContent = String(m.tick);
   $("o-digest").textContent = m.digest;

@@ -42,6 +42,7 @@ export class RideView {
     this.terrainZ = [];
     this.camera = { x: 0, z: 0, ready: false };
     this.sag = [0, 0];
+    this.groundCheck = { n: 0, maxDrawn: 0, maxContact: 0 };
     this.sagTime = -1;
     this.riderLayer = null;
     // Scratch, so the draw path allocates nothing per frame.
@@ -82,6 +83,7 @@ export class RideView {
     this.camera.ready = false;
     this.renderTime = 0;
     this.sagTime = -1;
+    this.groundCheck = { n: 0, maxDrawn: 0, maxContact: 0 };
     this.readColors();
   }
 
@@ -98,6 +100,19 @@ export class RideView {
     }
   }
 
+  /** The drawn ground height at x: the polyline the page mirrors from the engine's terrain, or NaN outside it. */
+  groundAt(x) {
+    const xs = this.terrainX, n = xs.length;
+    if (n < 2 || x < xs[0] || x > xs[n - 1]) return NaN;
+    let lo = 0, hi = n - 1;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (xs[mid] <= x) lo = mid; else hi = mid;
+    }
+    const f = (x - xs[lo]) / (xs[hi] - xs[lo]);
+    return this.terrainZ[lo] + (this.terrainZ[hi] - this.terrainZ[lo]) * f;
+  }
+
   dropTerrain(x) {
     let i = 0;
     while (i + 1 < this.terrainX.length && this.terrainX[i + 1] <= x) i++;
@@ -107,6 +122,7 @@ export class RideView {
   /** Adds a published state: { obs, casings, simTime }, and folds its travel into the running mean (the sag marks). */
   push(frame) {
     this.frames.push(frame);
+    if (frame.ground) this.checkGround(frame);
     if (this.frames.length > FRAMES_KEPT) this.frames.shift();
     const t = frame.simTime;
     const travel = [frame.obs[OBS.forkTravel], frame.obs[OBS.rearTravel]];
@@ -119,6 +135,21 @@ export class RideView {
       this.sag[1] += (travel[1] - this.sag[1]) * k;
     }
     this.sagTime = t;
+  }
+
+  // The ground check: under each tyre's mean contact point, the drawn ground must be the engine's ground (flow_ground_height,
+  // sampled by the worker), and the contact itself must lie on it. Worst errors are kept in groundCheck [m].
+  checkGround(frame) {
+    const o = frame.obs;
+    const gc = this.groundCheck;
+    for (let w = 0; w < 2; w++) {
+      if (o[w === 0 ? OBS.frontContacts : OBS.rearContacts] < 0.5) continue;
+      const cx = o[w === 0 ? OBS.frontContactX : OBS.rearContactX], cz = o[w === 0 ? OBS.frontContactZ : OBS.rearContactZ];
+      const drawn = this.groundAt(cx), engine = frame.ground[w];
+      gc.n++;
+      if (!(Math.abs(drawn - engine) <= gc.maxDrawn)) gc.maxDrawn = Number.isNaN(drawn) ? Infinity : Math.abs(drawn - engine);
+      if (Math.abs(cz - engine) > gc.maxContact) gc.maxContact = Math.abs(cz - engine);
+    }
   }
 
   // The state at the render clock, interpolated between the bracketing frames into the scratch arrays.
@@ -263,12 +294,13 @@ export class RideView {
     const { ctx, colors, dpr } = this;
     const t = this.tx;
     ctx.beginPath();
-    let started = false;
+    let started = false, firstX = 0, lastX = 0;
     const left = t.cx - W / 2 / scale - 0.5, right = t.cx + W / 2 / scale + 0.5;
     for (let i = 0; i < this.terrainX.length; i++) {
       const x = this.terrainX[i];
       if (x < left && this.terrainX[i + 1] < left) continue;
-      if (!started) { ctx.moveTo(sx(x), sz(this.terrainZ[i])); started = true; } else ctx.lineTo(sx(x), sz(this.terrainZ[i]));
+      if (!started) { ctx.moveTo(sx(x), sz(this.terrainZ[i])); started = true; firstX = x; } else ctx.lineTo(sx(x), sz(this.terrainZ[i]));
+      lastX = x;
       if (x > right) break;
     }
     if (!started) return;
@@ -276,8 +308,8 @@ export class RideView {
     ctx.lineWidth = 3 * dpr;
     ctx.lineJoin = "round";
     ctx.stroke();
-    ctx.lineTo(W + 10, H + 10);
-    ctx.lineTo(-10, H + 10);
+    ctx.lineTo(sx(lastX), H + 10);
+    ctx.lineTo(sx(firstX), H + 10);
     ctx.closePath();
     ctx.fillStyle = colors.ground;
     ctx.fill();

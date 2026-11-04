@@ -8,6 +8,9 @@
 //   choice and the numbers are logged to the page.
 // - Every ride is its seed, setup and an event log (inputs, terrain appends and drops by tick), so it can be replayed in a
 //   second bike and its digest compared: that is the "verify replay" control.
+// - A speed governor holds the ride at SPEED_LIMIT: above it the drive is cut and the brakes are held. The 3% stand-in trail
+//   otherwise runs the bike up to about 7 m/s, where a landing passes the model's contact-overlap guard and ends the ride
+//   (BikeDynamics tests/test_flow_api.cpp, "the page's ride"). The event log records the input applied, governor included.
 import { loadEngine, defaultSetup, PROFILE, STATUS, OBS, INFO, GUARD_NAMES } from "./engine.js";
 
 const SEED = 20260;          // the ride's trail seed (any 32-bit value)
@@ -21,6 +24,8 @@ const COST_WINDOW = 2.0;     // seconds of simulated time in the rolling cost
 const MARGIN = 1.0;          // cost must stay under budget * MARGIN
 const GRACE = 3.0;           // seconds of ride before the rolling check may degrade the profile
 const STRIKES = 3;           // consecutive over-budget checks before it does
+const SPEED_LIMIT = 5.0;     // m/s (18 km/h): the governor's limit; the worst contact overlap is then about 0.7 of the guard's
+const GOVERNOR = { frontBrake: 20, rearBrake: 40 }; // brake torques [N m] held above the limit
 
 let engine = null;
 let config = null;
@@ -125,10 +130,14 @@ function startRide(cfg, forcedProfile = null, reason = "") {
   const bike = engine.create(setupFor(cfg, profile));
   ride = {
     bike, profile, cfg, dt: bike.dt, accum: 0, ended: false, rideSeconds: 0, strikes: 0, nextCheck: 1.0,
-    trail: { x: 5, z: 0, next: 0 }, window: { x: [], z: [] }, events: [], snapshots: [], costs: [], busyTotal: 0, simTotal: 0,
+    trail: { x: bike.setup.startX + 5, z: bike.setup.startZ, next: 0 }, window: { x: [], z: [] }, events: [], snapshots: [], costs: [], busyTotal: 0, simTotal: 0,
     wallStart: performance.now(), lastSnapshotTick: -1, terrainMs: 0, terrainBuilds: 0, lastDigest: "",
+    applied: { drive: 0, frontBrake: 0, rearBrake: 0 }, speed: 0, governorLogged: false,
   };
   input = { drive: 0, frontBrake: 0, rearBrake: 0 };
+  // The engine's terrain starts as a flat run from start_x - 3 to start_x + 5 at start_z (flow_create): the page's mirror of
+  // it must begin the same way, or the view draws no ground under the launch.
+  ride.window = { x: [bike.setup.startX - 3, bike.setup.startX + 5], z: [bike.setup.startZ, bike.setup.startZ] };
   appendTrail(4);
   post({
     type: "started", profile, reason, info: bike.info, dt: bike.dt, setup: bike.setup, nodes: bike.nodes,
@@ -190,18 +199,40 @@ function ensureTerrain(obs) {
   if (obs[OBS.rearX] - BEHIND > obs[OBS.terrainFirstX] + 8) dropTrail(obs[OBS.rearX] - BEHIND);
 }
 
+// The rider's keys; what is applied (and logged) is decided per batch by applyInput, which adds the governor.
 function setInput(msg) {
-  const next = { drive: msg.drive ?? 0, frontBrake: msg.frontBrake ?? 0, rearBrake: msg.rearBrake ?? 0 };
-  if (next.drive === input.drive && next.frontBrake === input.frontBrake && next.rearBrake === input.rearBrake) return;
-  input = next;
-  if (ride) ride.events.push({ tick: ride.bike.tick, type: "input", ...next });
+  input = { drive: msg.drive ?? 0, frontBrake: msg.frontBrake ?? 0, rearBrake: msg.rearBrake ?? 0 };
+}
+
+// The governor (mirrored by BikeDynamics' PageRide::govern): above SPEED_LIMIT no drive, and at least GOVERNOR's brakes.
+function governed(keys, speed) {
+  if (!(speed > SPEED_LIMIT)) return { ...keys };
+  return {
+    drive: Math.min(keys.drive, 0), frontBrake: Math.max(keys.frontBrake, GOVERNOR.frontBrake),
+    rearBrake: Math.max(keys.rearBrake, GOVERNOR.rearBrake),
+  };
+}
+
+// The input for the next batch, from the keys and the last observed speed; a change goes into the event log.
+function applyInput() {
+  const next = governed(input, ride.speed);
+  const a = ride.applied;
+  if (next.drive !== a.drive || next.frontBrake !== a.frontBrake || next.rearBrake !== a.rearBrake) {
+    ride.applied = next;
+    ride.events.push({ tick: ride.bike.tick, type: "input", ...next });
+  }
+  if (ride.speed > SPEED_LIMIT && !ride.governorLogged) {
+    ride.governorLogged = true;
+    log(`speed governor: holding ${SPEED_LIMIT} m/s (${(SPEED_LIMIT * 3.6).toFixed(0)} km/h), the model's validated speed on this trail`);
+  }
+  return ride.applied;
 }
 
 function takeSnapshot() {
   const { bike } = ride;
   ride.snapshots.push({
     tick: bike.tick, bytes: bike.snapshot(), trail: { ...ride.trail }, events: ride.events.length,
-    window: { x: ride.window.x.slice(), z: ride.window.z.slice() }, input: { ...input },
+    window: { x: ride.window.x.slice(), z: ride.window.z.slice() }, applied: { ...ride.applied }, speed: ride.speed,
   });
   if (ride.snapshots.length > SNAPSHOTS_KEPT) ride.snapshots.shift();
   ride.lastSnapshotTick = bike.tick;
@@ -219,7 +250,8 @@ function rewind(seconds) {
   ride.snapshots = ride.snapshots.filter((s) => s.tick <= pick.tick);
   ride.ended = false;
   ride.accum = 0;
-  input = { ...pick.input };
+  ride.applied = { ...pick.applied };
+  ride.speed = pick.speed;
   post({ type: "terrain-reset", points: windowPoints() });
   log(`rewound to tick ${pick.tick} (${(pick.tick * ride.dt).toFixed(2)} s): snapshot restored, digest ${ride.bike.digestHex()}`);
   publish(true);
@@ -247,10 +279,11 @@ function loop() {
 function stepChunk(n) {
   const { bike } = ride;
   const t0 = performance.now();
-  const status = bike.step(n, input);
+  const status = bike.step(n, applyInput());
   const t1 = performance.now();
   const obs = bike.observe();
   const casings = bike.casings();
+  ride.speed = obs[OBS.speed];
   ensureTerrain(obs);
   const t2 = performance.now();
   const sim = n * ride.dt;
@@ -301,6 +334,8 @@ function publish(force, obs = null, casings = null) {
     terrainBuilds: ride.terrainBuilds, terrainMs: ride.terrainMs, ended: ride.ended, paused,
     ratio: ride.rideSeconds > 0 ? ride.rideSeconds / Math.max(1e-6, (performance.now() - ride.wallStart) / 1000) : 1,
     events: ride.events.length, at: performance.now(),
+    // The engine's own ground height under each tyre's mean contact point, for the view's ground check.
+    ground: [bike.groundHeight(obs[OBS.frontContactX]), bike.groundHeight(obs[OBS.rearContactX])],
   };
   post(message, [obs.buffer, ...casings.map((c) => c.buffer)]);
 }
